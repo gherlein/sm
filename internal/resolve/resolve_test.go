@@ -33,3 +33,27 @@ func TestResolveCleanAndCollision(t *testing.T) {
 		t.Fatalf("prefix wrong: %+v", p.Links)
 	}
 }
+
+// TestResolveDeterministicCollision verifies that when multiple distinct skill
+// names collide, the error reports the lexicographically smallest name.
+func TestResolveDeterministicCollision(t *testing.T) {
+	// Two distinct colliding names: "a" and "b", each from core+handy sources.
+	multiCollide := []discovery.Skill{
+		{Alias: "core", Name: "a", SourceDir: "/c/a"},
+		{Alias: "handy", Name: "a", SourceDir: "/h/a"},
+		{Alias: "core", Name: "b", SourceDir: "/c/b"},
+		{Alias: "handy", Name: "b", SourceDir: "/h/b"},
+	}
+	var ce *CollisionError
+	if _, err := Resolve(multiCollide, config.Options{}); !errors.As(err, &ce) {
+		t.Fatalf("expected CollisionError, got %v", err)
+	}
+	// Should report "a" (lexicographically smallest colliding name).
+	if ce.Name != "a" {
+		t.Fatalf("expected collision on name %q, got %q", "a", ce.Name)
+	}
+	// Aliases should be sorted.
+	if len(ce.Aliases) != 2 || ce.Aliases[0] != "core" || ce.Aliases[1] != "handy" {
+		t.Fatalf("expected sorted aliases [core, handy], got %v", ce.Aliases)
+	}
+}

@@ -30,11 +30,19 @@ func Resolve(skills []discovery.Skill, opts config.Options) (*Plan, error) {
 		for _, s := range skills {
 			byName[s.Name] = append(byName[s.Name], s.Alias)
 		}
+		// Collect all colliding names for deterministic ordering.
+		var colliding []string
 		for name, aliases := range byName {
 			if len(aliases) > 1 {
-				sort.Strings(aliases)
-				return nil, &CollisionError{Name: name, Aliases: aliases}
+				colliding = append(colliding, name)
 			}
+		}
+		if len(colliding) > 0 {
+			sort.Strings(colliding)
+			firstName := colliding[0]
+			aliases := byName[firstName]
+			sort.Strings(aliases)
+			return nil, &CollisionError{Name: firstName, Aliases: aliases}
 		}
 	}
 	var links []Link
