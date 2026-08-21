@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 
 	"github.com/BurntSushi/toml"
 )
@@ -76,4 +77,59 @@ func sortedKeys(m map[string]Source) []string {
 	}
 	sort.Strings(ks)
 	return ks
+}
+
+var invalidAliasChars = "/\\.:"
+
+func (m *Manifest) AddSource(alias string, s Source) error {
+	if alias == "" || strings.ContainsAny(alias, invalidAliasChars) {
+		return fmt.Errorf("invalid alias %q (no / \\ . :)", alias)
+	}
+	if _, ok := m.Skills[alias]; ok {
+		return fmt.Errorf("source %q already exists", alias)
+	}
+	if (s.Git != "") == (s.Path != "") {
+		return fmt.Errorf("source %q: specify exactly one of git or path", alias)
+	}
+	if m.Skills == nil {
+		m.Skills = map[string]Source{}
+	}
+	m.Skills[alias] = s
+	return nil
+}
+
+func (m *Manifest) RemoveSource(alias string) bool {
+	if _, ok := m.Skills[alias]; !ok {
+		return false
+	}
+	delete(m.Skills, alias)
+	return true
+}
+
+func Save(path string, m *Manifest) error {
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return err
+	}
+	f, err := os.Create(path)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	return toml.NewEncoder(f).Encode(m)
+}
+
+// ProjectManifestPath returns the nearest skills.toml at or below the repo,
+// walking up from startDir and stopping before home (home itself excluded).
+func ProjectManifestPath(startDir, home string) (string, bool) {
+	dir := startDir
+	for {
+		if dir == home || dir == filepath.Dir(dir) {
+			return "", false
+		}
+		p := filepath.Join(dir, "skills.toml")
+		if _, err := os.Stat(p); err == nil {
+			return p, true
+		}
+		dir = filepath.Dir(dir)
+	}
 }
