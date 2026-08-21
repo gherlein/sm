@@ -179,11 +179,17 @@ func place(env Env, m *config.Manifest, dryRun bool, stderr io.Writer) (int, int
 			continue
 		}
 		newLinks, conflicts, err := link.Apply(target, recon.Add, recon.Remove, prev)
-		if err != nil {
-			return 0, 0, err
-		}
 		for _, c := range conflicts {
 			fmt.Fprintf(stderr, "warning: %s/%s exists and was not created by sm; skipped\n", target, c)
+		}
+		if err != nil {
+			// link.Apply returns its partially-updated map on error so real progress
+			// on earlier agents isn't lost; persist it best-effort before reporting err.
+			if newLinks != nil {
+				st.Targets[target] = state.TargetLinks{Links: newLinks, UpdatedAt: time.Now().UTC().Format(time.RFC3339)}
+			}
+			_ = st.Save(env.StatePath)
+			return installed, removed, err
 		}
 		st.Targets[target] = state.TargetLinks{Links: newLinks, UpdatedAt: time.Now().UTC().Format(time.RFC3339)}
 	}
