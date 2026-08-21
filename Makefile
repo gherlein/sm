@@ -1,33 +1,60 @@
-# skills-mapper (sm)
-BIN := sm
-PKG := ./cmd/sm
+# Go parameters
+GOCMD=go
+GOBUILD=$(GOCMD) build
+GOCLEAN=$(GOCMD) clean
+GOTEST=$(GOCMD) test
+GOVET=$(GOCMD) vet
+GOGET=$(GOCMD) get
+GOMOD=$(GOCMD) mod
+
+BIN=sm
+PKG=./cmd/sm
 
 # Print the target list when make is invoked with no target.
 .DEFAULT_GOAL := help
 
-## help: list available targets
-help:
-	@echo "skills-mapper make targets:"
-	@grep -E '^## ' $(MAKEFILE_LIST) | sed 's/^## /  /'
+all: test build
 
-## build: compile the sm binary
 build:
-	go build -o $(BIN) $(PKG)
+	$(GOBUILD) -o $(BIN) $(PKG)
 
-## test: run the full test suite
 test: run-tests
 
-## run-tests: run the full test suite
 run-tests:
-	go test ./...
+	$(GOTEST) -v ./...
 
-## lint: gofmt check and go vet
+fmt:
+	$(GOCMD) fmt ./...
+
+vet:
+	$(GOVET) ./...
+
 lint:
-	gofmt -l . && go vet ./...
+	gofmt -l . && $(GOVET) ./...
 
-## clean: remove build artifacts
+deps:
+	$(GOMOD) download
+	$(GOMOD) tidy
+
+install:
+	$(GOCMD) install $(PKG)
+
 clean:
+	$(GOCLEAN)
 	rm -f $(BIN)
-	go clean
 
-.PHONY: help build test run-tests lint clean
+help:
+	@echo "skills-mapper (sm) make targets:"
+	@echo "  make build       - Build the sm binary"
+	@echo "  make test        - Run all tests (alias for run-tests)"
+	@echo "  make run-tests   - Run all tests"
+	@echo "  make fmt         - Format code (go fmt)"
+	@echo "  make vet         - Run go vet"
+	@echo "  make lint        - gofmt check + go vet"
+	@echo "  make deps        - Download and tidy dependencies"
+	@echo "  make install     - Install sm to GOPATH/bin"
+	@echo "  make clean       - Remove build artifacts"
+	@echo "  make all         - Run tests then build"
+	@echo "  make help        - Show this help message"
+
+.PHONY: all build test run-tests fmt vet lint deps install clean help
