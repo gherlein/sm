@@ -26,6 +26,8 @@ type Recon struct {
 	Remove []string
 }
 
+// Plan computes add/remove actions by comparing desired links against previous state.
+// Recon.Remove order is unspecified (map iteration order).
 func Plan(prev map[string]string, desired []resolve.Link) Recon {
 	want := map[string]bool{}
 	var r Recon
@@ -55,6 +57,7 @@ func Load(path string) (*State, error) {
 	if err := json.Unmarshal(data, &s); err != nil {
 		return nil, err
 	}
+	// Zero-value defaulting for caller safety: allows callers to index Targets without nil check.
 	if s.Targets == nil {
 		s.Targets = map[string]TargetLinks{}
 	}
