@@ -7,6 +7,7 @@ GOVET=$(GOCMD) vet
 GOGET=$(GOCMD) get
 GOMOD=$(GOCMD) mod
 
+BINDIR=bin
 BIN=sm
 PKG=./cmd/sm
 
@@ -16,7 +17,8 @@ PKG=./cmd/sm
 all: test build
 
 build:
-	$(GOBUILD) -o $(BIN) $(PKG)
+	mkdir -p $(BINDIR)
+	$(GOBUILD) -o $(BINDIR)/$(BIN) $(PKG)
 
 test: run-tests
 
@@ -41,11 +43,11 @@ install:
 
 clean:
 	$(GOCLEAN)
-	rm -f $(BIN)
+	rm -rf $(BINDIR)
 
 help:
 	@echo "skills-mapper (sm) make targets:"
-	@echo "  make build       - Build the sm binary"
+	@echo "  make build       - Build the sm binary into $(BINDIR)/"
 	@echo "  make test        - Run all tests (alias for run-tests)"
 	@echo "  make run-tests   - Run all tests"
 	@echo "  make fmt         - Format code (go fmt)"
