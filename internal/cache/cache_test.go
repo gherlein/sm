@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/gherlein/skills-mapper/internal/config"
+	"github.com/brightsign-playground/sm/internal/config"
 )
 
 func TestRepoDir(t *testing.T) {

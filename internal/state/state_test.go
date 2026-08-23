@@ -6,7 +6,7 @@ import (
 	"sort"
 	"testing"
 
-	"github.com/gherlein/skills-mapper/internal/resolve"
+	"github.com/brightsign-playground/sm/internal/resolve"
 )
 
 func TestPlanAddRemoveAndSourceChange(t *testing.T) {

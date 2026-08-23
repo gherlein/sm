@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/gherlein/skills-mapper/internal/config"
+	"github.com/brightsign-playground/sm/internal/config"
 )
 
 func RepoDir(root, gitURL string) (string, error) {

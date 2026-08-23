@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -23,6 +24,53 @@ func gitRepoWithSkill(t *testing.T) string {
 		}
 	}
 	return origin
+}
+
+func TestExtractFlags(t *testing.T) {
+	scope, verbose, rest := extractFlags([]string{"--global", "-v", "sync", "--dry-run"})
+	if scope != "global" || !verbose {
+		t.Fatalf("scope=%q verbose=%v, want global,true", scope, verbose)
+	}
+	if len(rest) != 2 || rest[0] != "sync" || rest[1] != "--dry-run" {
+		t.Fatalf("rest=%v, want [sync --dry-run]", rest)
+	}
+	if _, v, _ := extractFlags([]string{"--verbose", "list"}); !v {
+		t.Fatal("--verbose not recognized")
+	}
+	if _, v, _ := extractFlags([]string{"list"}); v {
+		t.Fatal("verbose should default off")
+	}
+}
+
+func TestSyncVerbose(t *testing.T) {
+	origin := gitRepoWithSkill(t)
+	newEnv := func() (Env, string) {
+		home := t.TempDir()
+		mp := filepath.Join(home, "skills.toml")
+		os.WriteFile(mp, []byte("[skills]\ncore = { git = \"file://"+origin+"\", ref = \"main\" }\n[agents]\nclaude-code = true\n"), 0o644)
+		return Env{Scope: "global", Root: home, ManifestPath: mp, CacheRoot: filepath.Join(home, "cache"), StatePath: filepath.Join(home, "state.json")}, home
+	}
+
+	verboseEnv, _ := newEnv()
+	verboseEnv.Verbose = true
+	var out, errOut bytes.Buffer
+	if code := run(verboseEnv, []string{"sync"}, &out, &errOut); code != 0 {
+		t.Fatalf("verbose sync exit %d: %s", code, errOut.String())
+	}
+	for _, want := range []string{"discovered", "link git-workflow", "target claude-code"} {
+		if !strings.Contains(errOut.String(), want) {
+			t.Fatalf("verbose output missing %q; got:\n%s", want, errOut.String())
+		}
+	}
+
+	quietEnv, _ := newEnv()
+	var qOut, qErr bytes.Buffer
+	if code := run(quietEnv, []string{"sync"}, &qOut, &qErr); code != 0 {
+		t.Fatalf("quiet sync exit %d: %s", code, qErr.String())
+	}
+	if qErr.Len() != 0 {
+		t.Fatalf("default sync should emit nothing on stderr; got:\n%s", qErr.String())
+	}
 }
 
 func TestSyncGlobalEndToEnd(t *testing.T) {

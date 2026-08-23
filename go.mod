@@ -1,4 +1,4 @@
-module github.com/gherlein/skills-mapper
+module github.com/brightsign-playground/sm
 
 go 1.26.2
 

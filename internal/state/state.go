@@ -8,7 +8,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/gherlein/skills-mapper/internal/resolve"
+	"github.com/brightsign-playground/sm/internal/resolve"
 )
 
 const version = 1

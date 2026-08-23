@@ -3,7 +3,7 @@ package main
 import (
 	"os"
 
-	"github.com/gherlein/skills-mapper/internal/cli"
+	"github.com/brightsign-playground/sm/internal/cli"
 )
 
 func main() {

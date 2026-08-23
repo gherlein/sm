@@ -3,7 +3,7 @@ package agents
 import (
 	"testing"
 
-	"github.com/gherlein/skills-mapper/internal/config"
+	"github.com/brightsign-playground/sm/internal/config"
 )
 
 func TestTargetDirScopes(t *testing.T) {

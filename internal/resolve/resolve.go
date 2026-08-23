@@ -7,8 +7,8 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/gherlein/skills-mapper/internal/config"
-	"github.com/gherlein/skills-mapper/internal/discovery"
+	"github.com/brightsign-playground/sm/internal/config"
+	"github.com/brightsign-playground/sm/internal/discovery"
 )
 
 type Link struct{ Name, SourceDir, Alias string }

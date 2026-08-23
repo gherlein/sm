@@ -4,8 +4,8 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/gherlein/skills-mapper/internal/config"
-	"github.com/gherlein/skills-mapper/internal/discovery"
+	"github.com/brightsign-playground/sm/internal/config"
+	"github.com/brightsign-playground/sm/internal/discovery"
 )
 
 func TestResolveCleanAndCollision(t *testing.T) {

@@ -7,48 +7,60 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"sort"
 	"time"
 
-	"github.com/gherlein/skills-mapper/internal/agents"
-	"github.com/gherlein/skills-mapper/internal/cache"
-	"github.com/gherlein/skills-mapper/internal/config"
-	"github.com/gherlein/skills-mapper/internal/discovery"
-	"github.com/gherlein/skills-mapper/internal/link"
-	"github.com/gherlein/skills-mapper/internal/resolve"
-	"github.com/gherlein/skills-mapper/internal/state"
+	"github.com/brightsign-playground/sm/internal/agents"
+	"github.com/brightsign-playground/sm/internal/cache"
+	"github.com/brightsign-playground/sm/internal/config"
+	"github.com/brightsign-playground/sm/internal/discovery"
+	"github.com/brightsign-playground/sm/internal/link"
+	"github.com/brightsign-playground/sm/internal/resolve"
+	"github.com/brightsign-playground/sm/internal/state"
 )
 
 type Env struct {
 	Scope, Root, ManifestPath, CacheRoot, StatePath string
+	Verbose                                         bool
 }
 
 // Run resolves scope + Env, then dispatches. A leading/anywhere --global or
 // --project token forces scope; otherwise scope is auto (project if a project
-// skills.toml is found walking up from cwd, else global).
+// skills.toml is found walking up from cwd, else global). -v/--verbose, allowed
+// anywhere, makes sync report each step on stderr.
 func Run(args []string, stdout, stderr io.Writer) int {
-	scope, rest := extractScope(args)
+	scope, verbose, rest := extractFlags(args)
 	env, err := buildEnv(scope)
 	if err != nil {
 		fmt.Fprintln(stderr, "error:", err)
 		return 1
 	}
+	env.Verbose = verbose
 	return run(env, rest, stdout, stderr)
 }
 
-func extractScope(args []string) (string, []string) {
-	scope := ""
-	var rest []string
+func extractFlags(args []string) (scope string, verbose bool, rest []string) {
 	for _, a := range args {
 		switch a {
 		case "--global":
 			scope = "global"
 		case "--project":
 			scope = "project"
+		case "-v", "--verbose":
+			verbose = true
 		default:
 			rest = append(rest, a)
 		}
 	}
-	return scope, rest
+	return scope, verbose, rest
+}
+
+// vlog returns the writer verbose lines go to: stderr when verbose, else a sink.
+func (e Env) vlog(stderr io.Writer) io.Writer {
+	if e.Verbose {
+		return stderr
+	}
+	return io.Discard
 }
 
 func buildEnv(scope string) (Env, error) {
@@ -93,7 +105,7 @@ func buildEnv(scope string) (Env, error) {
 
 func run(env Env, args []string, stdout, stderr io.Writer) int {
 	if len(args) == 0 {
-		fmt.Fprintln(stderr, "usage: sm [--global|--project] <init|sync|update|link|add|remove|list> ...")
+		fmt.Fprintln(stderr, "usage: sm [--global|--project] [-v|--verbose] <init|sync|update|link|add|remove|list> ...")
 		return 2
 	}
 	switch args[0] {
@@ -118,9 +130,11 @@ func run(env Env, args []string, stdout, stderr io.Writer) int {
 }
 
 // freshen updates all git caches and prunes caches not in the manifest.
-func freshen(env Env, m *config.Manifest) error {
+func freshen(env Env, m *config.Manifest, stderr io.Writer) error {
+	v := env.vlog(stderr)
 	var keep []string
-	for _, src := range m.Skills {
+	for _, alias := range sortedAliases(m.Skills) {
+		src := m.Skills[alias]
 		if src.Git == "" {
 			continue
 		}
@@ -128,12 +142,27 @@ func freshen(env Env, m *config.Manifest) error {
 		if err != nil {
 			return err
 		}
+		ref := src.Ref
+		if ref == "" {
+			ref = "default branch"
+		}
+		fmt.Fprintf(v, "updating cache: %s  %s (ref %s) -> %s\n", alias, src.Git, ref, dir)
 		if err := cache.Update(src, dir); err != nil {
 			return err
 		}
 		keep = append(keep, dir)
 	}
+	fmt.Fprintf(v, "pruning caches not in manifest\n")
 	return cache.Prune(env.CacheRoot, keep)
+}
+
+func sortedAliases(m map[string]config.Source) []string {
+	out := make([]string, 0, len(m))
+	for a := range m {
+		out = append(out, a)
+	}
+	sort.Strings(out)
+	return out
 }
 
 // place discovers, resolves, and reconciles links into enabled agents.
@@ -145,8 +174,10 @@ func place(env Env, m *config.Manifest, dryRun bool, stderr io.Writer) (int, int
 	if len(enabled) == 0 {
 		return 0, 0, fmt.Errorf("no agents enabled in [agents]")
 	}
+	v := env.vlog(stderr)
 	var skills []discovery.Skill
-	for alias, src := range m.Skills {
+	for _, alias := range sortedAliases(m.Skills) {
+		src := m.Skills[alias]
 		root, err := cache.SourceRoot(src, env.CacheRoot)
 		if err != nil {
 			return 0, 0, fmt.Errorf("source %q: %w", alias, err)
@@ -155,12 +186,14 @@ func place(env Env, m *config.Manifest, dryRun bool, stderr io.Writer) (int, int
 		if err != nil {
 			return 0, 0, fmt.Errorf("discover %q: %w", alias, err)
 		}
+		fmt.Fprintf(v, "discovered %d skills from %s\n", len(found), alias)
 		skills = append(skills, found...)
 	}
 	plan, err := resolve.Resolve(skills, m.Options)
 	if err != nil {
 		return 0, 0, err
 	}
+	fmt.Fprintf(v, "resolved %d links (prefix_on_collision=%t)\n", len(plan.Links), m.Options.PrefixOnCollision)
 	st, err := state.Load(env.StatePath)
 	if err != nil {
 		return 0, 0, err
@@ -175,6 +208,13 @@ func place(env Env, m *config.Manifest, dryRun bool, stderr io.Writer) (int, int
 		recon := state.Plan(prev, plan.Links)
 		installed += len(recon.Add)
 		removed += len(recon.Remove)
+		fmt.Fprintf(v, "target %s: %s\n", id, target)
+		for _, l := range recon.Add {
+			fmt.Fprintf(v, "  link %s -> %s\n", l.Name, l.SourceDir)
+		}
+		for _, name := range recon.Remove {
+			fmt.Fprintf(v, "  remove stale %s\n", name)
+		}
 		if dryRun {
 			continue
 		}
@@ -213,7 +253,7 @@ func cmdSync(env Env, args []string, stdout, stderr io.Writer) int {
 		return 1
 	}
 	if !*dry {
-		if err := freshen(env, m); err != nil {
+		if err := freshen(env, m, stderr); err != nil {
 			fmt.Fprintln(stderr, "error:", err)
 			return 1
 		}

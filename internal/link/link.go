@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/gherlein/skills-mapper/internal/resolve"
+	"github.com/brightsign-playground/sm/internal/resolve"
 )
 
 // Apply realizes an install plan as whole-directory symlinks, updating the

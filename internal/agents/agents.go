@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"sort"
 
-	"github.com/gherlein/skills-mapper/internal/config"
+	"github.com/brightsign-playground/sm/internal/config"
 )
 
 var Known = []string{"claude-code", "copilot", "hax", "oh-my-pi", "pi"}

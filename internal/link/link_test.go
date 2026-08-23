@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/gherlein/skills-mapper/internal/resolve"
+	"github.com/brightsign-playground/sm/internal/resolve"
 )
 
 func TestApplyCreateRemoveProtect(t *testing.T) {
