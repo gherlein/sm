@@ -126,3 +126,27 @@ func TestAddThenRemove(t *testing.T) {
 		t.Fatal("remove --sync should prune links")
 	}
 }
+
+func TestUpdateThenLinkSeparately(t *testing.T) {
+	origin := gitRepoWithSkill(t)
+	home := t.TempDir()
+	mp := filepath.Join(home, "skills.toml")
+	os.WriteFile(mp, []byte("[skills]\ncore = { git = \"file://"+origin+"\", ref = \"main\" }\n[agents]\nclaude-code = true\n"), 0o644)
+	env := Env{Scope: "global", Root: home, ManifestPath: mp, CacheRoot: filepath.Join(home, "cache"), StatePath: filepath.Join(home, "state.json")}
+	var out, errOut bytes.Buffer
+
+	// update: caches the repo, but creates no links yet
+	if code := run(env, []string{"update"}, &out, &errOut); code != 0 {
+		t.Fatalf("update exit %d: %s", code, errOut.String())
+	}
+	if _, err := os.Lstat(filepath.Join(home, ".claude/skills", "git-workflow")); !os.IsNotExist(err) {
+		t.Fatal("update must not create links")
+	}
+	// link: places from the existing cache
+	if code := run(env, []string{"link"}, &out, &errOut); code != 0 {
+		t.Fatalf("link exit %d: %s", code, errOut.String())
+	}
+	if _, err := os.Lstat(filepath.Join(home, ".claude/skills", "git-workflow")); err != nil {
+		t.Fatalf("link must create the symlink: %v", err)
+	}
+}

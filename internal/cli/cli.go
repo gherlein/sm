@@ -424,14 +424,36 @@ func loadOrEmpty(path string) (*config.Manifest, error) {
 	return config.Load(path)
 }
 
-// TODO(task-11): replace with the real update/link implementation.
 func cmdUpdate(env Env, stdout, stderr io.Writer) int {
-	fmt.Fprintln(stderr, "not implemented")
-	return 2
+	m, err := config.Load(env.ManifestPath)
+	if err != nil {
+		fmt.Fprintln(stderr, "error:", err)
+		return 1
+	}
+	if err := freshen(env, m, stderr); err != nil {
+		fmt.Fprintln(stderr, "error:", err)
+		return 1
+	}
+	fmt.Fprintf(stdout, "updated %d source(s)\n", len(m.Skills))
+	return 0
 }
 
-// TODO(task-11): replace with the real update/link implementation.
 func cmdLink(env Env, args []string, stdout, stderr io.Writer) int {
-	fmt.Fprintln(stderr, "not implemented")
-	return 2
+	fs := flag.NewFlagSet("link", flag.ContinueOnError)
+	dry := fs.Bool("dry-run", false, "plan without changing files")
+	if fs.Parse(args) != nil {
+		return 2
+	}
+	m, err := config.Load(env.ManifestPath)
+	if err != nil {
+		fmt.Fprintln(stderr, "error:", err)
+		return 1
+	}
+	ins, rem, err := place(env, m, *dry, stderr)
+	if err != nil {
+		fmt.Fprintln(stderr, "error:", err)
+		return 1
+	}
+	fmt.Fprintf(stdout, "%s link: +%d -%d\n", env.Scope, ins, rem)
+	return 0
 }
