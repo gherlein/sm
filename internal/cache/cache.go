@@ -79,40 +79,53 @@ func SourceRoot(src config.Source, cacheRoot string) (string, error) {
 }
 
 // Prune removes repo dirs under root that are not in keep. keep holds absolute
-// repo dirs (RepoDir outputs). Only descends two levels (host/owner/repo).
+// repo dirs (RepoDir outputs). Repo dirs can sit at any depth — GitLab
+// subgroups and file:// remotes map deeper than host/owner/repo — so pruning
+// follows the keep paths instead of assuming a fixed layout.
 func Prune(root string, keep []string) error {
 	keepSet := map[string]bool{}
 	for _, k := range keep {
 		keepSet[filepath.Clean(k)] = true
 	}
-	hosts, err := os.ReadDir(root)
+	return pruneDir(filepath.Clean(root), keepSet)
+}
+
+// pruneDir removes every entry under dir that neither is a kept repo dir nor
+// has one below it; ancestors of kept dirs are descended into, kept dirs are
+// left untouched.
+func pruneDir(dir string, keep map[string]bool) error {
+	entries, err := os.ReadDir(dir)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return nil
 		}
 		return err
 	}
-	for _, h := range hosts {
-		owners, err := os.ReadDir(filepath.Join(root, h.Name()))
-		if err != nil {
-			continue
-		}
-		for _, o := range owners {
-			repos, err := os.ReadDir(filepath.Join(root, h.Name(), o.Name()))
-			if err != nil {
-				continue
+	for _, e := range entries {
+		full := filepath.Join(dir, e.Name())
+		switch {
+		case keep[full]:
+		case hasKeptDescendant(full, keep):
+			if err := pruneDir(full, keep); err != nil {
+				return err
 			}
-			for _, r := range repos {
-				full := filepath.Join(root, h.Name(), o.Name(), r.Name())
-				if !keepSet[full] {
-					if err := os.RemoveAll(full); err != nil {
-						return err
-					}
-				}
+		default:
+			if err := os.RemoveAll(full); err != nil {
+				return err
 			}
 		}
 	}
 	return nil
+}
+
+func hasKeptDescendant(dir string, keep map[string]bool) bool {
+	prefix := dir + string(filepath.Separator)
+	for kept := range keep {
+		if strings.HasPrefix(kept, prefix) {
+			return true
+		}
+	}
+	return false
 }
 
 func DefaultRoot() (string, error) {

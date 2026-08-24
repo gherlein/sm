@@ -75,3 +75,27 @@ func TestSourceRootAndPrune(t *testing.T) {
 		t.Fatal("keep should survive")
 	}
 }
+
+// Repo dirs deeper than host/owner/repo (GitLab subgroups, file:// remotes)
+// must survive a prune that keeps them.
+func TestPruneKeepsDeepRepoDirs(t *testing.T) {
+	root := t.TempDir()
+	deepKeep := filepath.Join(root, "gitlab.com", "group", "subgroup", "team", "keep")
+	deepDrop := filepath.Join(root, "gitlab.com", "group", "subgroup", "team", "drop")
+	shallowDrop := filepath.Join(root, "gitlab.com", "group", "other")
+	for _, d := range []string{deepKeep, deepDrop, shallowDrop} {
+		os.MkdirAll(d, 0o755)
+	}
+	os.WriteFile(filepath.Join(deepKeep, "SKILL.md"), []byte("x"), 0o644)
+	if err := Prune(root, []string{deepKeep}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(deepKeep, "SKILL.md")); err != nil {
+		t.Fatalf("deep keep should survive with contents: %v", err)
+	}
+	for _, d := range []string{deepDrop, shallowDrop} {
+		if _, err := os.Stat(d); !os.IsNotExist(err) {
+			t.Fatalf("%s should be pruned", d)
+		}
+	}
+}
