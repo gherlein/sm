@@ -9,13 +9,19 @@ description: Use when registering, syncing, listing, or removing AI-agent skill 
 
 `sm` places skills (directories containing a `SKILL.md`) from declared sources
 (git repos or local paths) into each enabled agent's skills directory as
-symlinks. It is manifest-driven: **you edit a TOML file, then run `sm sync`** —
-placement only, no packaging.
+symlinks. It is manifest-driven: the manifest (`skills.toml`) is the source of
+truth — edit it (or use `sm add`/`sm remove`), then run `sm sync` — placement
+only, no packaging.
 
 ## Critical Facts (save yourself the probing)
 
-- **`sm add`, `remove`, `update`, `link` are stubs** — they return
-  "not implemented". Registration is ALWAYS: edit the manifest, then `sm sync`.
+- **Registration**: either edit the manifest and `sm sync`, or use
+  `sm add <git-url|path> [--as alias] [--ref r] [--subdir d] [--sync]` /
+  `sm remove <alias> [--sync] [--keep-cache]`. Without `--sync`, nothing is
+  fetched or linked until the next `sm sync`.
+- **`sm update`** refreshes caches only (clone/pull/prune, no linking);
+  **`sm link`** places from current caches only (`--dry-run` supported).
+  `sm sync` = both.
 - **`sm --help` and `sm help` fail.** Run bare `sm` to print usage.
 - Global manifest: `~/.config/skills-mapper/skills.toml` (honors
   `XDG_CONFIG_HOME`). `sm init` creates a starter one.
@@ -45,7 +51,8 @@ prefix_on_collision = false   # duplicate skill name across sources fails loud
 ## The Workflow
 
 ```bash
-# 1. add/change the source entry in ~/.config/skills-mapper/skills.toml
+# 1. register the source: edit ~/.config/skills-mapper/skills.toml, or
+sm add git@github.com:you/skills.git --as you --ref main
 # 2. parse check
 sm list                    # alias, source, ref (tab-separated)
 # 3. preview, then apply

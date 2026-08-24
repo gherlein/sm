@@ -200,17 +200,26 @@ sm sync --dry-run       # preview changes
 sm -v sync              # verbose: report each step on stderr
 sm list                 # list declared sources
 sm --project sync       # operate on the project manifest instead
+sm add <git-url|path> --as core --ref main --sync   # register a source (and sync)
+sm remove core --sync   # drop a source; prune its links and cache
+sm update               # freshness only: clone/pull/prune caches
+sm link                 # placement only from current caches (--dry-run)
 ```
 
-> **Not yet implemented:** `add`, `remove`, `update`, and `link` are stubs and
-> return a "not implemented" error. Edit `skills.toml` by hand and run `sm sync`.
+- `sm add` writes the source into `skills.toml` (`--as` sets the alias, defaulting
+  to the repo/dir name; `--ref` and `--subdir` are git-only). Without `--sync`,
+  nothing is fetched or linked until the next `sm sync`.
+- `sm remove <alias>` deletes the manifest entry; with `--sync` it also prunes the
+  now-stale links and cache (`--keep-cache` preserves the clone).
+- `sm update` and `sm link` are the two halves of `sync`, for when you want them
+  separately — for example, scheduling `update` alone.
 
 ## Bundled skill
 
 This repo ships its own AI-agent skill, [`skills/using-skills-mapper/`](skills/using-skills-mapper/SKILL.md),
 which teaches a coding agent how to drive `sm`: the manifest format, the
-edit-then-sync workflow, and the gotchas (stub subcommands, scope
-auto-detection, dry-run counting). `sm` can distribute it like any other
+edit-then-sync workflow, and the gotchas (scope auto-detection, dry-run
+counting). `sm` can distribute it like any other
 source — add the repo to your manifest and sync:
 
 ```toml
