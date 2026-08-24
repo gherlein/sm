@@ -6,3 +6,9 @@
 coverage.*
 # SDD scratch
 /.superpowers/
+.env
+.envrc
+*~
+bin/
+.llm/
+vendor/
