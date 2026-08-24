@@ -205,6 +205,21 @@ sm --project sync       # operate on the project manifest instead
 > **Not yet implemented:** `add`, `remove`, `update`, and `link` are stubs and
 > return a "not implemented" error. Edit `skills.toml` by hand and run `sm sync`.
 
+## Bundled skill
+
+This repo ships its own AI-agent skill, [`skills/using-skills-mapper/`](skills/using-skills-mapper/SKILL.md),
+which teaches a coding agent how to drive `sm`: the manifest format, the
+edit-then-sync workflow, and the gotchas (stub subcommands, scope
+auto-detection, dry-run counting). `sm` can distribute it like any other
+source — add the repo to your manifest and sync:
+
+```toml
+[skills]
+sm-tool = { git = "https://github.com/gherlein/sm", ref = "main", subdir = "skills" }
+# or, from a local checkout:
+# sm-tool = { path = "~/src/tools/sm/skills" }
+```
+
 ## Files and locations
 
 | Path                                         | What                          |
@@ -220,6 +235,7 @@ The config and data roots honor `XDG_CONFIG_HOME` and `XDG_DATA_HOME`.
 
 ```
 cmd/sm/           entry point
+skills/           bundled AI-agent skill(s), distributable by sm itself
 internal/
   cli/            command wiring (init, sync, list, ...)
   config/         skills.toml parse / validate / write
