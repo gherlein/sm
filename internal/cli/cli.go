@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/brightsign-playground/sm/internal/agents"
@@ -301,16 +302,126 @@ func cmdList(env Env, stdout, stderr io.Writer) int {
 	return 0
 }
 
-// TODO(task-10): replace with the real add/remove implementation.
 func cmdAdd(env Env, args []string, stdout, stderr io.Writer) int {
-	fmt.Fprintln(stderr, "not implemented")
-	return 2
+	fs := flag.NewFlagSet("add", flag.ContinueOnError)
+	as := fs.String("as", "", "alias (defaults to repo/dir name)")
+	ref := fs.String("ref", "", "git ref (branch|tag|commit)")
+	subdir := fs.String("subdir", "", "subdirectory within the source")
+	sync := fs.Bool("sync", false, "sync after adding")
+	target, ok := parseWithPositional(fs, args)
+	if !ok {
+		fmt.Fprintln(stderr, "usage: sm add <git-url|path> [--as alias] [--ref r] [--subdir d] [--sync]")
+		return 2
+	}
+	src := config.Source{Ref: *ref, Subdir: *subdir}
+	if looksLikeGit(target) {
+		src.Git = target
+	} else {
+		src.Path = target
+	}
+	alias := *as
+	if alias == "" {
+		alias = deriveAlias(target)
+	}
+	m, err := loadOrEmpty(env.ManifestPath)
+	if err != nil {
+		fmt.Fprintln(stderr, "error:", err)
+		return 1
+	}
+	if err := m.AddSource(alias, src); err != nil {
+		fmt.Fprintln(stderr, "error:", err)
+		return 1
+	}
+	if err := config.Save(env.ManifestPath, m); err != nil {
+		fmt.Fprintln(stderr, "error:", err)
+		return 1
+	}
+	fmt.Fprintf(stdout, "added %s\n", alias)
+	if *sync {
+		if err := freshen(env, m, stderr); err != nil {
+			fmt.Fprintln(stderr, "error:", err)
+			return 1
+		}
+		if _, _, err := place(env, m, false, stderr); err != nil {
+			fmt.Fprintln(stderr, "error:", err)
+			return 1
+		}
+	}
+	return 0
 }
 
-// TODO(task-10): replace with the real add/remove implementation.
 func cmdRemove(env Env, args []string, stdout, stderr io.Writer) int {
-	fmt.Fprintln(stderr, "not implemented")
-	return 2
+	fs := flag.NewFlagSet("remove", flag.ContinueOnError)
+	sync := fs.Bool("sync", false, "sync after removing")
+	keepCache := fs.Bool("keep-cache", false, "do not prune the cached repo")
+	alias, ok := parseWithPositional(fs, args)
+	if !ok {
+		fmt.Fprintln(stderr, "usage: sm remove <alias> [--sync] [--keep-cache]")
+		return 2
+	}
+	m, err := config.Load(env.ManifestPath)
+	if err != nil {
+		fmt.Fprintln(stderr, "error:", err)
+		return 1
+	}
+	if !m.RemoveSource(alias) {
+		fmt.Fprintf(stderr, "no such source %q\n", alias)
+		return 1
+	}
+	if err := config.Save(env.ManifestPath, m); err != nil {
+		fmt.Fprintln(stderr, "error:", err)
+		return 1
+	}
+	if *sync {
+		if !*keepCache {
+			// freshen prunes the now-unreferenced cache
+			if err := freshen(env, m, stderr); err != nil {
+				fmt.Fprintln(stderr, "error:", err)
+				return 1
+			}
+		}
+		// reconcile prunes the stale links
+		if _, _, err := place(env, m, false, stderr); err != nil {
+			fmt.Fprintln(stderr, "error:", err)
+			return 1
+		}
+	}
+	fmt.Fprintf(stdout, "removed %s\n", alias)
+	return 0
+}
+
+// parseWithPositional parses a flag set whose command takes exactly one
+// positional argument that may appear before, between, or after flags —
+// stdlib flag alone stops at the first non-flag token.
+func parseWithPositional(fs *flag.FlagSet, args []string) (string, bool) {
+	if fs.Parse(args) != nil {
+		return "", false
+	}
+	rest := fs.Args()
+	if len(rest) == 0 {
+		return "", false
+	}
+	positional := rest[0]
+	if fs.Parse(rest[1:]) != nil {
+		return "", false
+	}
+	return positional, fs.NArg() == 0
+}
+
+func looksLikeGit(s string) bool {
+	return strings.HasPrefix(s, "http://") || strings.HasPrefix(s, "https://") ||
+		strings.HasPrefix(s, "git@") || strings.HasPrefix(s, "file://") || strings.HasPrefix(s, "ssh://")
+}
+
+func deriveAlias(target string) string {
+	return filepath.Base(strings.TrimSuffix(target, ".git"))
+}
+
+func loadOrEmpty(path string) (*config.Manifest, error) {
+	if _, err := os.Stat(path); os.IsNotExist(err) {
+		return &config.Manifest{Skills: map[string]config.Source{}, Agents: map[string]bool{}}, nil
+	}
+	return config.Load(path)
 }
 
 // TODO(task-11): replace with the real update/link implementation.

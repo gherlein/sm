@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/brightsign-playground/sm/internal/config"
 )
 
 func gitRepoWithSkill(t *testing.T) string {
@@ -96,5 +98,31 @@ func TestSyncGlobalEndToEnd(t *testing.T) {
 	}
 	if _, err := os.Lstat(filepath.Join(home, ".claude/skills", "git-workflow")); !os.IsNotExist(err) {
 		t.Fatal("link should be pruned after source removed")
+	}
+}
+
+func TestAddThenRemove(t *testing.T) {
+	origin := gitRepoWithSkill(t)
+	home := t.TempDir()
+	mp := filepath.Join(home, "skills.toml")
+	os.WriteFile(mp, []byte("[agents]\nclaude-code = true\n"), 0o644)
+	env := Env{Scope: "global", Root: home, ManifestPath: mp, CacheRoot: filepath.Join(home, "cache"), StatePath: filepath.Join(home, "state.json")}
+	var out, errOut bytes.Buffer
+
+	if code := run(env, []string{"add", "file://" + origin, "--as", "core", "--ref", "main", "--sync"}, &out, &errOut); code != 0 {
+		t.Fatalf("add exit %d: %s", code, errOut.String())
+	}
+	if _, err := os.Lstat(filepath.Join(home, ".claude/skills", "git-workflow")); err != nil {
+		t.Fatalf("add --sync should link: %v", err)
+	}
+	m, _ := config.Load(mp)
+	if m.Skills["core"].Git != "file://"+origin {
+		t.Fatalf("manifest not updated: %+v", m.Skills)
+	}
+	if code := run(env, []string{"remove", "core", "--sync"}, &out, &errOut); code != 0 {
+		t.Fatalf("remove exit %d: %s", code, errOut.String())
+	}
+	if _, err := os.Lstat(filepath.Join(home, ".claude/skills", "git-workflow")); !os.IsNotExist(err) {
+		t.Fatal("remove --sync should prune links")
 	}
 }
