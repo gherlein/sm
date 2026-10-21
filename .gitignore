@@ -1,0 +1,14 @@
+# Build output
+/bin/
+# Go
+*.test
+*.out
+coverage.*
+# SDD scratch
+/.superpowers/
+.env
+.envrc
+*~
+bin/
+.llm/
+vendor/
