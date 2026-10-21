@@ -77,6 +77,8 @@ specifications are proposals (drafts), not adopted standards.
 - [Uninstall](#uninstall)
 - [Files and locations](#files-and-locations)
 - [Development](#development)
+- [Tools that carry their own skill](#tools-that-carry-their-own-skill)
+- [Credits](#credits)
 
 ## Quick start
 
@@ -1071,6 +1073,18 @@ Specifications and design:
 - [`docs/DESIGN.md`](docs/DESIGN.md): design of `sm` and `ms`.
 - [`VISION.md`](VISION.md) and [`NEEDED.md`](NEEDED.md): the problem and the motivation.
 - [`docs/plans/`](docs/plans/): implementation plans.
+
+## Tools that carry their own skill
+
+These tools follow the [Skill Self-Installation Specification](SKILL-INSTALL-SPEC.md):
+each embeds its skill in the executable, so `<tool> print-skill` shows it to an
+agent immediately and `<tool> install-skill` puts it in the store, ready for
+`sm sync`.
+
+| Logo | Tool | What it does |
+| --- | --- | --- |
+| <a href="https://github.com/gherlein/gofi"><img src="https://raw.githubusercontent.com/gherlein/gofi/main/images/gofi-logo.png" height="96" alt="gofi logo"></a> | [gofi](https://github.com/gherlein/gofi) | Go command-line tool and library for UniFi controllers: fixed IP assignments, local DNS, clients and networks. |
+| <a href="https://github.com/gherlein/gogl"><img src="https://raw.githubusercontent.com/gherlein/gogl/main/images/gl-gopher-antennas-transparent.png" height="96" alt="gogl logo"></a> | [gogl](https://github.com/gherlein/gogl) | Go command-line tool and library for GL.iNet travel routers running firmware 4.x. |
 
 ## Credits
 
