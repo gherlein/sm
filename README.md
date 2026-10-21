@@ -87,6 +87,19 @@ later, `git`, `make`, and `~/.local/bin` on your `PATH`.
 
 The repository is <https://github.com/gherlein/sm>
 
+**Install with Homebrew.** Releases are published to a Homebrew tap. The
+`brew trust` step is required because Homebrew refuses to load formulae from a
+tap you have not trusted:
+
+```sh
+brew tap gherlein/tap
+brew trust gherlein/tap
+brew install skills-mapper    # installs both sm and ms
+```
+
+Then skip to step 2 below. Like everything else here, the Homebrew install is
+tested on Linux only; the formula also lists macOS binaries, which are untested.
+
 **Quick install for Go users.** To install just the two binaries, with no
 checkout, run:
 
