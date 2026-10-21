@@ -12,3 +12,6 @@ coverage.*
 bin/
 .llm/
 vendor/
+
+# GoReleaser output
+/dist/
