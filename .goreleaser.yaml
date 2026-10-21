@@ -1,0 +1,59 @@
+# GoReleaser v2 configuration. Validate with `goreleaser check` and rehearse with
+# `goreleaser release --snapshot --clean` before tagging; neither has been run
+# for this repository yet.
+version: 2
+
+project_name: skills-mapper
+
+builds:
+  - id: sm
+    main: ./cmd/sm
+    binary: sm
+    env:
+      - CGO_ENABLED=0
+    goos: [linux, darwin]
+    goarch: [amd64, arm64]
+  - id: ms
+    main: ./cmd/ms
+    binary: ms
+    env:
+      - CGO_ENABLED=0
+    goos: [linux, darwin]
+    goarch: [amd64, arm64]
+
+# One archive per platform holding both binaries, since the two tools are
+# installed together.
+archives:
+  - id: skills-mapper
+    ids: [sm, ms]
+    formats: [tar.gz]
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    files:
+      - README.md
+
+checksum:
+  name_template: checksums.txt
+
+changelog:
+  sort: asc
+
+# Publishes Formula/skills-mapper.rb to the tap on every tag. The brews key is
+# deprecated in recent GoReleaser releases in favour of homebrew_casks, but casks
+# are macOS-only and this tool is tested on Linux, so the formula route is kept.
+# The token needs write access to the gherlein/homebrew-tap repository.
+brews:
+  - name: skills-mapper
+    ids: [skills-mapper]
+    repository:
+      owner: gherlein
+      name: homebrew-tap
+      token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
+    homepage: https://github.com/gherlein/sm
+    description: Map one store of AI agent skills into every coding agent's skills folder
+    license: ""
+    test: |
+      system bin/"sm", "-h"
+      system bin/"ms", "-h"
+    install: |
+      bin.install "sm"
+      bin.install "ms"
