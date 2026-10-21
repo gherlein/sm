@@ -87,6 +87,18 @@ later, `git`, `make`, and `~/.local/bin` on your `PATH`.
 
 The repository is <https://github.com/gherlein/sm>
 
+**Quick install for Go users.** To install just the two binaries, with no
+checkout, run:
+
+```sh
+go install github.com/gherlein/sm/cmd/sm@latest
+go install github.com/gherlein/sm/cmd/ms@latest
+```
+
+They land in your Go binary directory (`$GOBIN`, or `~/go/bin` by default; put
+it on your `PATH`). Then skip to step 2 below. Building from a checkout (next)
+is the way to get the `make` targets and run the tests.
+
 ```sh
 # 0. Get the source (run everything below from the checkout).
 git clone https://github.com/gherlein/sm.git
