@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="images/sm-logo.png" alt="skills-mapper logo: a Go gopher in a central burrow with tunnels to six agent burrows" width="313">
+</p>
+
 # skills-mapper (`sm` and `ms`)
 
 AI coding agents share a skill format (a directory with a `SKILL.md`) but each
@@ -1029,3 +1033,7 @@ Specifications and design:
 - [`docs/DESIGN.md`](docs/DESIGN.md): design of `sm` and `ms`.
 - [`VISION.md`](VISION.md) and [`NEEDED.md`](NEEDED.md): the problem and the motivation.
 - [`docs/plans/`](docs/plans/): implementation plans.
+
+## Credits
+
+The Go gopher in the logo was designed by Renee French and is licensed under [CC BY 3.0](https://creativecommons.org/licenses/by/3.0/).
