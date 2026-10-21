@@ -1,6 +1,7 @@
-# GoReleaser v2 configuration. Validate with `goreleaser check` and rehearse with
-# `goreleaser release --snapshot --clean` before tagging; neither has been run
-# for this repository yet.
+# GoReleaser v2 configuration. Rehearse a release with
+# `goreleaser release --snapshot --clean` (verified: builds all four platforms and
+# writes dist/homebrew/skills-mapper.rb). `goreleaser check` reports the brews
+# deprecation below as a failure; that is expected and accepted.
 version: 2
 
 project_name: skills-mapper
