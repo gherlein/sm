@@ -4,12 +4,17 @@
 
 # skills-mapper (`sm` and `ms`)
 
-AI coding agents share a skill format (a directory with a `SKILL.md`) but each
-one reads skills only from its own folder, so the same skill has to be copied
-into `~/.claude/skills`, `~/.copilot/skills` and every other agent's folder by
-hand. skills-mapper keeps one agent-neutral **store** of skills and mirrors it
-into every agent's folder: `sm` fans the store out to the agents, and `ms` is
-the on-ramp that copies the skills you already have into the store.
+AI coding agents have converged on a skill *format* (a directory with a
+`SKILL.md`), but each commercial agent keeps its skills in its own proprietary
+location: Anthropic's Claude Code reads `~/.claude/skills`, GitHub Copilot
+reads `~/.copilot/skills`, and so on. A skill written for one has to be copied
+by hand into every other agent's folder. skills-mapper keeps one agent-neutral
+**store** of skills and mirrors it into every agent's folder: `sm` fans the
+store out to the agents, and `ms` is the on-ramp that copies the skills you
+already have into the store.
+
+> **Tested on Linux only.** macOS builds but has not been tested; Windows is
+> unsupported. See [Limitations](#limitations).
 
 ```mermaid
 flowchart LR
@@ -24,8 +29,41 @@ Background: [`VISION.md`](VISION.md) (why), [`docs/DESIGN.md`](docs/DESIGN.md)
 (how), [`SKILLS-DIRECTORY-SPEC.md`](SKILLS-DIRECTORY-SPEC.md) (the store
 contract).
 
+## Why this exists, and what we propose
+
+Skills are worth reusing across agents, yet nothing says where they should live
+on disk. `AGENTS.md` standardizes repository-level instructions for coding
+agents, but there is no equivalent specification for the user-global skills
+directory: every vendor chose its own path, so a skill you wrote or installed
+for one agent is invisible to the others.
+
+Two proposals in this repository address that, and `sm` and `ms` bridge the gap
+until agents adopt them:
+
+1. **A standard place for skills.** The
+   [Skills Directory Specification](SKILLS-DIRECTORY-SPEC.md) proposes one
+   agent-neutral store, `$XDG_DATA_HOME/skills/` (by default
+   `~/.local/share/skills/`), with one directory per skill. An agent that reads
+   the store directly needs no mapping.
+2. **Tools that carry their own skill.** The
+   [Skill Self-Installation Specification](SKILL-INSTALL-SPEC.md) proposes that a
+   command-line tool, especially one written in Go, embeds its own skill in the
+   executable (with `//go:embed`) and exposes two fixed subcommands.
+   `<tool> print-skill` writes the skill to standard output, so an agent can
+   learn about a tool it has never seen, dynamically, with nothing installed.
+   `<tool> install-skill` writes the skill into the store, and `sm sync` then
+   maps it into the default skills folder of whichever coding agents the user
+   prefers. Whoever has the binary gets the documentation for it, and the
+   skill and the tool ship as one artifact.
+
+Until agents read the standard place themselves, a mapping step is needed in
+both directions: `ms` maps skills *from* an agent's proprietary folder *into*
+the store, and `sm` maps the store *out to* each agent's folder. Both
+specifications are proposals (drafts), not adopted standards.
+
 ## Contents
 
+- [Why this exists, and what we propose](#why-this-exists-and-what-we-propose)
 - [Quick start](#quick-start)
 - [Day to day](#day-to-day)
 - [Concepts](#concepts)
@@ -42,7 +80,7 @@ contract).
 
 ## Quick start
 
-Requirements: Linux (tested) or macOS (builds, but untested), Go 1.26.2 or
+Requirements: Linux (the only tested platform; macOS builds but is untested), Go 1.26.2 or
 later, `git`, `make`, and `~/.local/bin` on your `PATH`.
 
 The repository is <https://github.com/gherlein/sm>
@@ -794,7 +832,7 @@ store is what the agent gets.
 ## Limitations
 
 - User-global only: there is no per-project or system-wide store.
-- Tested on Linux. macOS builds but has not been tested. Windows is untested
+- Tested on Linux only. macOS builds but has not been tested. Windows is untested
   and unsupported: symlink mode needs extra privileges there, and the lock and
   ownership checks are no-ops.
 - Symlink mode is live, copy mode is a snapshot (see [Concepts](#concepts)).
