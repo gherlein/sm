@@ -54,7 +54,10 @@ until agents adopt them:
    `<tool> install-skill` writes the skill into the store, and `sm sync` then
    maps it into the default skills folder of whichever coding agents the user
    prefers. Whoever has the binary gets the documentation for it, and the
-   skill and the tool ship as one artifact.
+   skill and the tool ship as one artifact. **`sm` and `ms` implement this
+   specification:** each carries this repository's own skill and installs it
+   with `sm install-skill` (or `ms install-skill`), or prints it to stdout with
+   `print-skill` (see [Command reference](#command-reference)).
 
 Until agents read the standard place themselves, a mapping step is needed in
 both directions: `ms` maps skills *from* an agent's proprietary folder *into*
@@ -87,14 +90,14 @@ later, `git`, `make`, and `~/.local/bin` on your `PATH`.
 
 The repository is <https://github.com/gherlein/sm>
 
-**Install with Homebrew.** Releases are published to a Homebrew tap. The
-`brew trust` step is required because Homebrew refuses to load formulae from a
-tap you have not trusted:
+**Install with Homebrew.** Trust the tap first — Homebrew refuses to load
+formulae from an untrusted third-party tap — then install (one formula gives you
+both `sm` and `ms`):
 
 ```sh
 brew tap gherlein/tap
 brew trust gherlein/tap
-brew install skills-mapper    # installs both sm and ms
+brew install skills-mapper
 ```
 
 Then skip to step 2 below. Like everything else here, the Homebrew install is
@@ -111,6 +114,12 @@ go install github.com/gherlein/sm/cmd/ms@latest
 They land in your Go binary directory (`$GOBIN`, or `~/go/bin` by default; put
 it on your `PATH`). Then skip to step 2 below. Building from a checkout (next)
 is the way to get the `make` targets and run the tests.
+
+**Install the skill that teaches agents to drive these tools.** Both binaries
+carry it inside the executable. Once `sm` is on your `PATH`, run `sm
+install-skill` to write it into the store as `using-skills-mapper` (the `sm
+sync` in step 5 then mirrors it to your agents); `sm print-skill` prints it to
+stdout without installing anything.
 
 ```sh
 # 0. Get the source (run everything below from the checkout).
@@ -458,6 +467,9 @@ Flags accept one or two dashes.
 | | `--yes` | Add every detected agent without asking. |
 | | `--dry-run` | Report what would be added; write nothing. |
 | `sm init` | | Write a starter `agents.toml`. No flags. |
+| `sm install-skill` | | Install the carried `using-skills-mapper` skill into the store. Needs no config; works on a freshly built binary. |
+| | `-f`, `--force` | Replace an existing skill of that name that differs from the carried one. |
+| `sm print-skill` | | Write the carried skill's `SKILL.md` to stdout verbatim; install nothing. |
 | `ms <source> [dest]` | | Copy the skills under `source` into `dest` (default: the store). |
 | | `--format NAME` | Source layout. Only `claude-code` (the default) exists. |
 | | `--force` | Replace skills that already exist in `dest`. |
@@ -467,7 +479,12 @@ Flags accept one or two dashes.
 | | `--` | End of flags; everything after it is a path. |
 
 Exit codes for both tools: `0` success, `1` error, `2` usage error (a bad flag,
-missing arguments, `sm` with no command).
+missing arguments, `sm` with no command), and `3` when `install-skill` refuses
+an existing skill that differs from the carried one (re-run with `--force`).
+
+`ms` accepts the same two self-skill subcommands as its first argument
+(`ms install-skill`, `ms print-skill`); both binaries carry and install the
+identical `using-skills-mapper` skill, so either one puts it in the store.
 
 Usage errors are caught before anything is read or written, so a mistake never
 widens what a command touches:
@@ -1101,10 +1118,13 @@ Specifications and design:
 
 ## Tools that carry their own skill
 
-These tools follow the [Skill Self-Installation Specification](SKILL-INSTALL-SPEC.md):
-each embeds its skill in the executable, so `<tool> print-skill` shows it to an
-agent immediately and `<tool> install-skill` puts it in the store, ready for
-`sm sync`.
+`sm` and `ms` carry their own skill this way: `sm install-skill` (or `ms
+install-skill`) puts the `using-skills-mapper` skill in the store, ready for
+`sm sync`, and `sm print-skill` writes it to stdout. The same
+[Skill Self-Installation Specification](SKILL-INSTALL-SPEC.md) is followed by
+other tools, each embedding its skill in the executable so `<tool> print-skill`
+shows it to an agent immediately and `<tool> install-skill` puts it in the
+store:
 
 | Logo | Tool | What it does |
 | --- | --- | --- |
