@@ -10,9 +10,11 @@ import (
 	"sort"
 
 	"github.com/gherlein/sm/internal/agents"
+	"github.com/gherlein/sm/internal/carried"
 	"github.com/gherlein/sm/internal/pathutil"
 	"github.com/gherlein/sm/internal/state"
 	"github.com/gherlein/sm/internal/store"
+	"github.com/gherlein/sm/skill"
 )
 
 const (
@@ -64,6 +66,32 @@ var commands = map[string]command{
 		flagSummary: "[--yes] [--dry-run]",
 		run:         runProbe,
 	},
+	"install-skill": {
+		summary:     "install the carried skill into the store",
+		flagSummary: "[-f|--force]",
+		run:         runInstallSkill,
+	},
+	"print-skill": {
+		summary:     "print the carried skill's SKILL.md to stdout",
+		flagSummary: "(no flags)",
+		run:         runPrintSkill,
+	},
+}
+
+// carriedSkill is the one skill this binary embeds and can install or print.
+func carriedSkill() carried.Skill {
+	return carried.Skill{FS: skill.FS, Name: skill.Name}
+}
+
+// runInstallSkill and runPrintSkill satisfy the Skill Self-Installation
+// Specification; they deliberately bypass config, state, and target resolution
+// so a freshly built binary can install or print its skill before it is set up.
+func runInstallSkill(ctx commandContext) int {
+	return carried.RunInstall(carriedSkill(), "sm", ctx.args, ctx.stdout, ctx.stderr)
+}
+
+func runPrintSkill(ctx commandContext) int {
+	return carried.RunPrint(carriedSkill(), "sm", ctx.args, ctx.stdout, ctx.stderr)
 }
 
 // Run dispatches args and returns the process exit code. -v/--verbose is
@@ -102,8 +130,8 @@ func printUsage(w io.Writer) {
 	fmt.Fprintln(w, "       sm -h | --help | help")
 	fmt.Fprintln(w, "commands:")
 	for _, name := range sortedCommandNames() {
-		fmt.Fprintf(w, "  %-8s %s\n", name, commands[name].summary)
-		fmt.Fprintf(w, "  %-8s   flags: %s\n", "", commands[name].flagSummary)
+		fmt.Fprintf(w, "  %-13s %s\n", name, commands[name].summary)
+		fmt.Fprintf(w, "  %-13s   flags: %s\n", "", commands[name].flagSummary)
 	}
 	fmt.Fprintln(w, "run 'sm <command> -h' for per-command flag help")
 }

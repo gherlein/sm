@@ -58,10 +58,16 @@ deps:
 	$(GOMOD) download
 	$(GOMOD) tidy
 
-INSTALLDIR=$(HOME)/.local/bin
+# Install into Homebrew's bin when brew is on PATH, so a locally built sm/ms
+# lands in the same directory a `brew install` would and wins name resolution
+# there; otherwise fall back to ~/.local/bin. Evaluated lazily (=) so `brew`
+# runs only for `make install`, never for build or the default help target.
+BREW_PREFIX = $(shell command -v brew >/dev/null 2>&1 && brew --prefix)
+INSTALLDIR = $(if $(BREW_PREFIX),$(BREW_PREFIX)/bin,$(HOME)/.local/bin)
 
 install:
 	GOBIN=$(INSTALLDIR) $(GOCMD) install $(SM_PKG) $(MS_PKG)
+	@echo "installed sm and ms to $(INSTALLDIR)"
 
 clean:
 	$(GOCLEAN)
@@ -77,7 +83,7 @@ help:
 	@echo "  make lint        - Fail on unformatted files (gofmt -l), then go vet"
 	@echo "  make vuln        - Run govulncheck (must be installed; not part of all/test)"
 	@echo "  make deps        - Download and tidy dependencies"
-	@echo "  make install     - Install sm and ms to ~/.local/bin"
+	@echo "  make install     - Install sm and ms (Homebrew bin if present, else ~/.local/bin)"
 	@echo "  make clean       - Remove build artifacts"
 	@echo "  make all         - Run tests then build"
 	@echo "  make help        - Show this help message"

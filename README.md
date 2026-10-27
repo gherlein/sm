@@ -26,7 +26,7 @@ flowchart LR
 ```
 
 Background: [`VISION.md`](VISION.md) (why), [`docs/DESIGN.md`](docs/DESIGN.md)
-(how), [`SKILLS-DIRECTORY-SPEC.md`](SKILLS-DIRECTORY-SPEC.md) (the store
+(how), [`SKILLS-DIRECTORY-SPEC.md`](https://github.com/gherlein/embedded-skills-standard/blob/main/SKILLS-DIRECTORY-SPEC.md) (the store
 contract).
 
 ## Why this exists, and what we propose
@@ -41,12 +41,12 @@ Two proposals in this repository address that, and `sm` and `ms` bridge the gap
 until agents adopt them:
 
 1. **A standard place for skills.** The
-   [Skills Directory Specification](SKILLS-DIRECTORY-SPEC.md) proposes one
+   [Skills Directory Specification](https://github.com/gherlein/embedded-skills-standard/blob/main/SKILLS-DIRECTORY-SPEC.md) proposes one
    agent-neutral store, `$XDG_DATA_HOME/skills/` (by default
    `~/.local/share/skills/`), with one directory per skill. An agent that reads
    the store directly needs no mapping.
 2. **Tools that carry their own skill.** The
-   [Skill Self-Installation Specification](SKILL-INSTALL-SPEC.md) proposes that a
+   [Skill Self-Installation Specification](https://github.com/gherlein/embedded-skills-standard/blob/main/SKILL-INSTALL-SPEC.md) proposes that a
    command-line tool, especially one written in Go, embeds its own skill in the
    executable (with `//go:embed`) and exposes two fixed subcommands.
    `<tool> print-skill` writes the skill to standard output, so an agent can
@@ -238,7 +238,7 @@ plugin skills in your other agents, and review them first: `ms` prints a
   `^[a-z0-9]([a-z0-9-]*[a-z0-9])?$` and equal the frontmatter `name`. Entries
   starting with `.` (such as `.git`) are ignored, so a git checkout works as a
   store. Anything else that does not conform is warned about and not
-  mirrored. The full contract is [`SKILLS-DIRECTORY-SPEC.md`](SKILLS-DIRECTORY-SPEC.md).
+  mirrored. The full contract is [`SKILLS-DIRECTORY-SPEC.md`](https://github.com/gherlein/embedded-skills-standard/blob/main/SKILLS-DIRECTORY-SPEC.md).
 - **Agent**: a name plus the skills directory that agent reads, listed in
   `~/.config/skills-mapper/agents.toml`. `sm` only writes into directories
   listed there.
@@ -272,7 +272,7 @@ The store is filled by whoever produces skills. `sm` only reads it.
   straight into the store, and updated with
   `git -C ~/.local/share/skills pull` followed by `sm sync`.
 - **A tool or package** can write its own skill into the store; the companion
-  [`SKILL-INSTALL-SPEC.md`](SKILL-INSTALL-SPEC.md) describes how a command-line
+  [`SKILL-INSTALL-SPEC.md`](https://github.com/gherlein/embedded-skills-standard/blob/main/SKILL-INSTALL-SPEC.md) describes how a command-line
   tool carries and installs its skill. Producing that install step (the
   "producer-side install", piece 3 of [`NEEDED.md`](NEEDED.md)) is **out of
   scope for this repository**: `sm` and `ms` do not implement it, and nothing
@@ -1110,8 +1110,8 @@ internal/
 
 Specifications and design:
 
-- [`SKILLS-DIRECTORY-SPEC.md`](SKILLS-DIRECTORY-SPEC.md): the store location and skill directory contract.
-- [`SKILL-INSTALL-SPEC.md`](SKILL-INSTALL-SPEC.md): how a tool carries and installs its own skill.
+- [`SKILLS-DIRECTORY-SPEC.md`](https://github.com/gherlein/embedded-skills-standard/blob/main/SKILLS-DIRECTORY-SPEC.md): the store location and skill directory contract.
+- [`SKILL-INSTALL-SPEC.md`](https://github.com/gherlein/embedded-skills-standard/blob/main/SKILL-INSTALL-SPEC.md): how a tool carries and installs its own skill.
 - [`docs/DESIGN.md`](docs/DESIGN.md): design of `sm` and `ms`.
 - [`VISION.md`](VISION.md) and [`NEEDED.md`](NEEDED.md): the problem and the motivation.
 - [`docs/plans/`](docs/plans/): implementation plans.
@@ -1121,7 +1121,7 @@ Specifications and design:
 `sm` and `ms` carry their own skill this way: `sm install-skill` (or `ms
 install-skill`) puts the `using-skills-mapper` skill in the store, ready for
 `sm sync`, and `sm print-skill` writes it to stdout. The same
-[Skill Self-Installation Specification](SKILL-INSTALL-SPEC.md) is followed by
+[Skill Self-Installation Specification](https://github.com/gherlein/embedded-skills-standard/blob/main/SKILL-INSTALL-SPEC.md) is followed by
 other tools, each embedding its skill in the executable so `<tool> print-skill`
 shows it to an agent immediately and `<tool> install-skill` puts it in the
 store:

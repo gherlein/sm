@@ -11,11 +11,13 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/gherlein/sm/internal/carried"
 	"github.com/gherlein/sm/internal/ingest"
 	"github.com/gherlein/sm/internal/link"
 	"github.com/gherlein/sm/internal/pathutil"
 	"github.com/gherlein/sm/internal/state"
 	"github.com/gherlein/sm/internal/store"
+	"github.com/gherlein/sm/skill"
 )
 
 const (
@@ -48,6 +50,18 @@ var positionalNames = [...]string{"source", "destination"}
 
 // Run executes ms with args and returns the process exit code.
 func Run(args []string, stdout, stderr io.Writer) (exitCode int) {
+	// The self-skill subcommands are fixed by the Skill Self-Installation
+	// Specification and must work on a freshly built binary, so they are
+	// dispatched before any flag parsing, ingest setup, or locking.
+	if len(args) > 0 {
+		switch args[0] {
+		case "install-skill":
+			return carried.RunInstall(carriedSkill(), "ms", args[1:], stdout, stderr)
+		case "print-skill":
+			return carried.RunPrint(carriedSkill(), "ms", args[1:], stdout, stderr)
+		}
+	}
+
 	flags := flag.NewFlagSet("ms", flag.ContinueOnError)
 	flags.SetOutput(stderr)
 	// The stdlib calls Usage before returning ErrHelp; usage is printed by Run
@@ -309,6 +323,14 @@ func printUsage(w io.Writer) {
 	fmt.Fprintln(w, "  --follow-symlinks   ingest skills reached through symlinks, including ones outside the source tree")
 	fmt.Fprintln(w, "  -h, --help          show this help")
 	fmt.Fprintln(w, "  --                  end of flags; everything after it is a path, even if it starts with '-'")
+	fmt.Fprintln(w, "subcommands (given as the first argument):")
+	fmt.Fprintln(w, "  install-skill [-f|--force]   install the carried skill into the store")
+	fmt.Fprintln(w, "  print-skill                  write the carried skill's SKILL.md to stdout")
+}
+
+// carriedSkill is the one skill this binary embeds and can install or print.
+func carriedSkill() carried.Skill {
+	return carried.Skill{FS: skill.FS, Name: skill.Name}
 }
 
 func resolveDestination(optional []string) (string, error) {

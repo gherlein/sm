@@ -8,7 +8,7 @@ but not on a *location*. **skills-mapper** (two Go binaries, **`sm`** and
 live, and make every agent's proprietary skills directory a derived view of it.
 
 This VISION captures the problem and the solution. The agent-neutral store is
-specified on its own in [`SKILLS-DIRECTORY-SPEC.md`](SKILLS-DIRECTORY-SPEC.md);
+specified on its own in [`SKILLS-DIRECTORY-SPEC.md`](https://github.com/gherlein/embedded-skills-standard/blob/main/SKILLS-DIRECTORY-SPEC.md);
 the design of `sm` and `ms` is in [`docs/DESIGN.md`](docs/DESIGN.md), and the
 user reference is [`README.md`](README.md).
 
@@ -68,7 +68,7 @@ Why this wins:
 
 ## Two artifacts, two jobs
 
-1. **The store standard** — [`SKILLS-DIRECTORY-SPEC.md`](SKILLS-DIRECTORY-SPEC.md).
+1. **The store standard** — [`SKILLS-DIRECTORY-SPEC.md`](https://github.com/gherlein/embedded-skills-standard/blob/main/SKILLS-DIRECTORY-SPEC.md).
    Agent-neutral. Defines only *where* skills live and *what* a skill directory
    is. It mentions no tool, no symlinks, no fan-out — any agent or producer can
    adopt it on its own.
