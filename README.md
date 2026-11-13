@@ -193,6 +193,7 @@ is safe to run any time (use `sm sync --dry-run` to preview).
 | Stop using an agent | Remove its line from `agents.toml`, then `sm clean --orphans` to remove the links `sm` left there. |
 | Check that all is well | `sm status`: every agent should show `missing=0 unmanaged=0 dangling=0`. Warnings about store entries are printed after the `store:` line. |
 | Adopt skills an agent made itself | `ms <agent skills folder>`, then `sm sync` (see [Getting skills into the store](#getting-skills-into-the-store)). |
+| Give a one-shot run only some skills | `sm map --profile <name> <folder>` — symlink just the named skills from the store into that folder (see [Map a subset into a folder](#map-a-subset-into-a-folder)). |
 | Undo everything | `sm clean`, then see [Uninstall](#uninstall). |
 
 When something looks off, start with `sm status`, then
@@ -226,6 +227,35 @@ the plugin, once as a personal skill). Ingest the whole tree only when you want
 plugin skills in your other agents, and review them first: `ms` prints a
 `note:` line whenever it wrote plugin skills (see
 [Safety and trust model](#safety-and-trust-model)).
+
+## Map a subset into a folder
+
+`sm sync` fans the whole store into every enabled agent. `sm map` does the
+opposite: it projects a hand-picked **subset** of the store into **one folder
+you name** — a one-shot sub-agent's working directory, or a real agent dir —
+so that run sees only the skills it needs.
+
+```sh
+sm map --profile go-dev ./run            # named profile ~/.config/skills-mapper/profiles/go-dev.toml
+sm map --from ./run-skills.toml ./run     # any profile file by path
+sm map ./run rebuild lint                 # an ad-hoc list of skill names
+sm map --from ./run-skills.toml ./run --dry-run   # preview "map: +N -M"
+sm map --copy ./sandbox rebuild           # real copies, for a home a symlink can't reach
+```
+
+A profile is a hand-edited TOML list of clean skill names:
+
+```toml
+skills = ["rebuild", "lint"]
+```
+
+The target folder is taken **literally** — `sm map ./run rebuild` writes
+`./run/rebuild`, so pass `./run/.agents/skills` when that is what you want. An
+unknown or non-conforming skill name fails the whole run and places nothing.
+`sm map` reconciles like `sm sync` (only links it made are ever removed, never
+a hand-placed file), and it marks the folder so `sm clean --orphans` leaves it
+alone. To tear a mapped folder down, delete it or re-map with a smaller
+profile.
 
 ## Concepts
 

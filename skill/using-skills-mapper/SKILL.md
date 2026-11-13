@@ -56,6 +56,7 @@ unsupported). Build with `make build` (produces `./bin/sm` and `./bin/ms`);
 | Command | Does | Flags |
 | --- | --- | --- |
 | `sm sync` | Link (or copy) every store skill into each agent dir; reconcile removals | `--dry-run`, `--copy`, `--store DIR`, `--agent-home DIR`, `--allow-empty` |
+| `sm map <folder> [skill…]` | Link (or copy) a **profile subset** of the store into one named folder; reconcile | `--profile NAME`, `--from PATH`, `--copy`, `--dry-run`, `--store DIR` |
 | `sm init` | Write a starter `agents.toml` (every known agent commented out). Refuses to overwrite | (none) |
 | `sm status` | Read-only report per agent: `owned/missing/unmanaged/dangling` | `--store DIR`, `--agent-home DIR` |
 | `sm clean` | Remove every `sm`-created link/copy (identity-checked) | `--agent NAME`, `--agent-home DIR`, `--orphans` |
@@ -64,9 +65,20 @@ unsupported). Build with `make build` (produces `./bin/sm` and `./bin/ms`);
 | `sm print-skill` | Write the carried skill's `SKILL.md` to stdout (nothing installed) | (none) |
 | `sm -h` / `--help` / `help` | Usage | |
 
-Run `sm <command> -h` for per-command flag help. No subcommand takes positional
-arguments; a stray positional is a usage error (exit 2), so `sm sync now` is
-refused rather than silently dropping later flags.
+Run `sm <command> -h` for per-command flag help. Only `sm map` takes positional
+arguments (the target folder, then optional ad-hoc skill names, with flags
+allowed in any position); for every other subcommand a stray positional is a
+usage error (exit 2), so `sm sync now` is refused rather than silently dropping
+later flags.
+
+`sm map` projects a hand-picked subset of the store into one folder you name —
+a one-shot sub-agent dir or a real agent dir. Name the subset exactly one of
+three ways: `--profile NAME` (a file at
+`~/.config/skills-mapper/profiles/NAME.toml`), `--from PATH` (any profile file),
+or trailing skill names. A profile is a TOML list, `skills = ["rebuild", "lint"]`
+(clean store names). The folder is literal (no `.agents/skills` is appended); an
+unknown or non-conforming name fails the run and places nothing; the folder is
+marked so `sm clean --orphans` leaves it alone.
 
 Exit codes: `0` ok, `1` error, `2` usage error, `3` `install-skill` refused
 (target exists and differs; use `--force`).

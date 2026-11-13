@@ -46,6 +46,11 @@ var commands = map[string]command{
 		flagSummary: "[--dry-run] [--copy] [--store DIR] [--agent-home DIR] [--allow-empty]",
 		run:         runSync,
 	},
+	"map": {
+		summary:     "link a profile's skills from the store into a target folder",
+		flagSummary: "[--profile NAME | --from PATH] [--copy] [--dry-run] [--store DIR] <target-dir> [skill ...]",
+		run:         runMap,
+	},
 	"init": {
 		summary:     "write a starter agents.toml",
 		flagSummary: "(no flags)",
