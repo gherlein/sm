@@ -34,8 +34,15 @@ func runMap(ctx commandContext) int {
 
 	// map is the one verb with positionals, so it parses them itself: the
 	// shared parseFlags rejects positionals and stdlib flag stops at the first.
-	positionals, ok := parsePositionals(flags, ctx.args)
-	if !ok || len(positionals) == 0 {
+	positionals, parseErr := parsePositionals(flags, ctx.args)
+	if errors.Is(parseErr, flag.ErrHelp) {
+		// Match every other verb's -h/--help: full flag help on stdout, exit 0.
+		flags.SetOutput(ctx.stdout)
+		fmt.Fprintln(ctx.stdout, mapUsage)
+		flags.PrintDefaults()
+		return exitOK
+	}
+	if parseErr != nil || len(positionals) == 0 {
 		fmt.Fprintln(ctx.stderr, mapUsage)
 		return exitUsage
 	}
@@ -218,16 +225,17 @@ func resolveStore(storeFlag string) (string, error) {
 
 // parsePositionals parses flags that may appear anywhere among positional
 // arguments: it re-parses after each positional so a flag following the target
-// is still honored.
-func parsePositionals(flags *flag.FlagSet, args []string) (positionals []string, ok bool) {
+// is still honored. It returns the parse error (including flag.ErrHelp) so the
+// caller can distinguish a help request from a malformed flag.
+func parsePositionals(flags *flag.FlagSet, args []string) (positionals []string, err error) {
 	rem := args
 	for {
-		if flags.Parse(rem) != nil {
-			return nil, false
+		if parseErr := flags.Parse(rem); parseErr != nil {
+			return nil, parseErr
 		}
 		rem = flags.Args()
 		if len(rem) == 0 {
-			return positionals, true
+			return positionals, nil
 		}
 		positionals = append(positionals, rem[0])
 		rem = rem[1:]
