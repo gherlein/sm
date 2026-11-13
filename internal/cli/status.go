@@ -172,6 +172,8 @@ func doStatus(cfg agents.Config, storeDir, statePath string, orphanScope bool, o
 			fmt.Fprintf(out, "provisioned target: %s (%d entries; clean with: sm clean --agent-home %s)\n", target.dir, entries, target.agentHome)
 		case orphanTarget:
 			fmt.Fprintf(out, "orphaned target: %s (%d entries)\n", target.dir, entries)
+		case mappedTarget:
+			fmt.Fprintf(out, "mapped target: %s (%d entries)\n", target.dir, entries)
 		case unclassifiableTarget:
 			fmt.Fprintf(out, "unclassifiable target: %s (%s)\n", target.dir, target.reason)
 		default:

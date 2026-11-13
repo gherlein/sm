@@ -563,3 +563,35 @@ func TestProvisionedUnder_PrefersLongestSuffix(t *testing.T) {
 		t.Errorf("provisionedUnder = (%q, %q, %v), want (\"pi\", \"/ctr\", true)", agentName, agentHome, isProvisioned)
 	}
 }
+
+// TestCleanOrphansSkipsMappedTarget proves a target sm created with `sm map`
+// (marked Mapped, never in agents.toml) is left alone by clean --orphans
+// instead of being swept as an orphaned agent directory.
+func TestCleanOrphansSkipsMappedTarget(t *testing.T) {
+	fixture := newSyncFixture(t, "alpha")
+	mappedDir := filepath.Join(t.TempDir(), "run")
+	current := loadState(t, fixture.statePath)
+	seedOwnedLink(t, current, mappedDir, "alpha", filepath.Join(fixture.storeDir, "alpha"))
+	target := current.Targets[mappedDir]
+	target.Mapped = true
+	current.Targets[mappedDir] = target
+	if err := current.Save(fixture.statePath); err != nil {
+		t.Fatal(err)
+	}
+
+	var out bytes.Buffer
+	summary, err := doClean(fixture.cfg, fixture.statePath, "", true, &out)
+	if err != nil {
+		t.Fatalf("doClean --orphans: %v", err)
+	}
+	if summary != noOrphansSummary {
+		t.Errorf("summary %q, want %q", summary, noOrphansSummary)
+	}
+	if !isSymlink(t, filepath.Join(mappedDir, "alpha")) {
+		t.Error("mapped target link was removed by --orphans")
+	}
+	after := loadState(t, fixture.statePath)
+	if _, recorded := after.Targets[mappedDir].Links["alpha"]; !recorded {
+		t.Error("mapped target record was dropped by --orphans")
+	}
+}

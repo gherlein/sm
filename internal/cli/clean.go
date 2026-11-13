@@ -139,6 +139,9 @@ const (
 	// unclassifiableTarget: the key could not be resolved (a symlink loop, an
 	// unreadable parent), so nothing is known about it and nothing is done.
 	unclassifiableTarget
+	// mappedTarget: a folder sm created with `sm map` (state Target.Mapped).
+	// It is deliberate, not an orphaned agent, so clean --orphans leaves it be.
+	mappedTarget
 )
 
 // unmappedTarget is a state target no configured agent maps. agentName is the
@@ -198,6 +201,10 @@ func classifyUnmapped(cfg agents.Config, current state.State) ([]unmappedTarget,
 		}
 		if agentName, agentHome, isProvisioned := provisionedUnder(cfg, homes, dir); isProvisioned {
 			unmapped = append(unmapped, unmappedTarget{dir: dir, kind: provisionedTarget, agentName: agentName, agentHome: agentHome})
+			continue
+		}
+		if current.Targets[dir].Mapped {
+			unmapped = append(unmapped, unmappedTarget{dir: dir, kind: mappedTarget})
 			continue
 		}
 		unmapped = append(unmapped, unmappedTarget{dir: dir, kind: orphanTarget})
@@ -371,6 +378,8 @@ func cleanOrphans(cfg agents.Config, current *state.State, statePath string, out
 			fmt.Fprintf(out, "unclassifiable target: %s (%s)\n", target.dir, target.reason)
 		case provisionedTarget:
 			fmt.Fprintf(out, "%s: provisioned with --agent-home; left alone (clean with: sm clean --agent-home %s)\n", target.dir, target.agentHome)
+		case mappedTarget:
+			fmt.Fprintf(out, "%s: mapped target (sm map); left alone (remove the directory to reclaim it)\n", target.dir)
 		case orphanTarget:
 			// An orphan has no agent name any more; its directory names it.
 			orphan := agents.Agent{Name: target.dir, Dir: target.dir}
