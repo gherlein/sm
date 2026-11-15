@@ -309,6 +309,44 @@ unmap: -2
 For a one-off run you can skip the profile and name the skills directly:
 `sm map ~/runs/review-43 go-test lint`.
 
+### Run an agent with only one skill
+
+Map the skill into a temporary folder, then start the agent so that folder is
+the only place it loads skills from. How well that works depends on the agent.
+
+**pi** has flags for exactly this: `--no-skills` turns off skill discovery, and
+`--skill` loads the folder you name (pi follows the symlinks `sm map` makes):
+
+```sh
+run=$(mktemp -d)
+sm map "$run" using-skills-mapper
+pi --no-skills --skill "$run"
+sm unmap "$run" && rm -rf "$run"
+```
+
+**Claude Code** has no flag that limits it to the skills you choose. The
+closest you can get is to point `CLAUDE_CONFIG_DIR` (default `~/.claude`) at a
+temporary folder, so the mapped skill is the only *personal* skill, and to
+start in an empty folder, so there are no *project* skills:
+
+```sh
+run=$(mktemp -d)
+sm map "$run/claude/skills" using-skills-mapper
+mkdir "$run/work" && cd "$run/work"
+CLAUDE_CONFIG_DIR="$run/claude" claude    # type /skills to see what loaded
+cd - && sm unmap "$run/claude/skills" && rm -rf "$run"
+```
+
+That still isn't one skill. Claude Code always adds its built-in skills, and if
+you sign in with a claude.ai account it also loads the skills attached to that
+account (shown in `/skills` as `claude.ai sync`) and any plugins your
+organization pushes (`locked by plugin`). Those come with the login, so a
+container signed in to the same account gets them too. Signing in with a
+Console API key (`ANTHROPIC_API_KEY`) instead should avoid the account skills,
+and `claude --bare` (which requires an API key) also skips plugin sync; neither
+has been tested here yet. The new config folder starts with no login, no
+settings, no plugins and no MCP servers.
+
 ### Set up skills for a container
 
 A container can't follow symlinks into your home directory, so give it real

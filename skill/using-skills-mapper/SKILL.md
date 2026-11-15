@@ -211,6 +211,25 @@ sm map --profile go-review ~/runs/review-42   # map: +2 -0
 sm unmap ~/runs/review-42                     # unmap: -2
 ```
 
+**Run an agent with exactly one skill** (for example, to test a skill in
+isolation). pi supports this directly; `--no-skills` disables discovery and
+`--skill` loads only the named folder:
+
+```sh
+run=$(mktemp -d)
+sm map "$run" using-skills-mapper
+pi --no-skills --skill "$run"
+sm unmap "$run" && rm -rf "$run"
+```
+
+Claude Code cannot be limited to chosen skills. `CLAUDE_CONFIG_DIR="$run/claude"`
+with `sm map "$run/claude/skills" <skill>`, started from an empty folder,
+removes the other personal and project skills, but built-in skills always load,
+and a claude.ai login also brings the account's synced skills and any
+organization-pushed plugins. A Console API key (`ANTHROPIC_API_KEY`, optionally
+with `claude --bare`) should avoid those, but that is untested. Do not promise a user a
+one-skill Claude Code session.
+
 **Provision a container home with real copies** (symlinks into your home would
 not resolve inside the container):
 
