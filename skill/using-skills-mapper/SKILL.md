@@ -1,6 +1,6 @@
 ---
 name: using-skills-mapper
-description: Use when driving the sm and ms CLIs (skills-mapper) to manage AI-agent skills - mirroring one agent-neutral skills store out into each agent's folder (sm sync/status/clean/probe/init), ingesting an agent's existing skills into the store (ms), installing or printing the carried skill (sm/ms install-skill and print-skill), editing agents.toml, choosing symlink vs copy mode, using --store/--agent-home, or diagnosing owned/missing/unmanaged/dangling output.
+description: Use when driving the sm and ms CLIs (skills-mapper) to manage AI-agent skills - mirroring one agent-neutral skills store out into each agent's folder (sm sync/status/clean/probe/init), projecting a named subset of the store into one folder such as a sub-agent's run dir (sm map, profiles), ingesting an agent's existing skills into the store (ms), installing or printing the carried skill (sm/ms install-skill and print-skill), editing agents.toml, choosing symlink vs copy mode, using --store/--agent-home, or diagnosing owned/missing/unmanaged/dangling output.
 ---
 
 # Using skills-mapper (`sm` and `ms`)
@@ -77,8 +77,13 @@ three ways: `--profile NAME` (a file at
 `~/.config/skills-mapper/profiles/NAME.toml`), `--from PATH` (any profile file),
 or trailing skill names. A profile is a TOML list, `skills = ["rebuild", "lint"]`
 (clean store names). The folder is literal (no `.agents/skills` is appended); an
-unknown or non-conforming name fails the run and places nothing; the folder is
-marked so `sm clean --orphans` leaves it alone.
+unknown or non-conforming name fails the run and places nothing. Re-mapping the
+same folder with a smaller profile removes what left it. `sm map` needs no
+`agents.toml`; `sm status` lists the folder as `mapped target`, and neither
+`sm clean` nor `sm clean --orphans` touches it. Deleting the folder removes the
+links, but its state record stays (there is no unmap verb yet), so `status`
+keeps listing it. Do not map into a folder `agents.toml` also lists: `sync` and
+`map` would each undo the other's selection.
 
 Exit codes: `0` ok, `1` error, `2` usage error, `3` `install-skill` refused
 (target exists and differs; use `--force`).
@@ -170,7 +175,8 @@ Keep the backup *outside* `~/.claude` so a later `ms ~/.claude` does not re-inge
 | Start using another agent | `sm probe` (or add a line to `agents.toml`), then `sm sync`. |
 | Stop using an agent | Remove its line from `agents.toml`, then `sm clean --orphans`. |
 | Adopt skills an agent made itself | `ms <agent skills folder>`, then `sm sync`. |
-| Undo everything | `sm clean`. |
+| Give one run only some skills | `sm map --profile <name> <folder>` (or `--from PATH`, or trailing names). |
+| Undo everything | `sm clean` (mapped folders are left; delete them yourself). |
 
 > `ms ~/.claude/skills` takes only personal skills. `ms ~/.claude` walks the
 > whole tree **including `~/.claude/plugins`**, pulling in plugin skills (which
@@ -222,7 +228,7 @@ claude-code    owned=2 missing=0 unmanaged=0 dangling=0  ~/.claude/skills
 | `dangling` | Recorded entry whose store skill is gone, or an `sm` link whose target moved | `sm sync` repoints/removes |
 
 A healthy agent shows `missing=0 unmanaged=0 dangling=0`. `sm status` with no
-`--agent-home` also reports **orphaned / aliased / provisioned / unclassifiable**
+`--agent-home` also reports **orphaned / aliased / provisioned / mapped / unclassifiable**
 state targets (directories in state that no configured agent maps).
 
 ## Symlink vs copy mode
@@ -273,8 +279,9 @@ state targets (directories in state that no configured agent maps).
 | --- | --- |
 | `$XDG_DATA_HOME/skills/` | The store |
 | `$XDG_CONFIG_HOME/skills-mapper/agents.toml` | Agents to mirror into |
+| `$XDG_CONFIG_HOME/skills-mapper/profiles/<name>.toml` | `sm map --profile` skill lists (`skills = [...]`), hand-written |
 | `$XDG_DATA_HOME/skills-mapper/state.json` | `sm`'s record of links/copies it owns (`0600`) |
-| `$XDG_DATA_HOME/skills-mapper/state.json.lock` | Lock shared by `sm sync`, `sm clean`, `ms` |
+| `$XDG_DATA_HOME/skills-mapper/state.json.lock` | Lock shared by `sm sync`, `sm map`, `sm clean`, `ms` |
 | `$XDG_DATA_HOME/skills-mapper/ingest-log.json` | `ms` ingest ledger (`0600`) |
 | `<agent dir>/<name>/.sm-copy` | Copy-mode provenance marker |
 | `<dir>/.sm-stage-*`, `<dir>/.sm-old-*` | Temp staging/set-aside during copy/replace |
@@ -293,6 +300,8 @@ existing one you own to `0700`.
 | Store skill skipped as `illegal skill name` / `name mismatch` | Dir name must match the regex **and** equal the frontmatter `name`. |
 | `no agents enabled in agents.toml` | Nothing is uncommented in `agents.toml`; run `sm probe` or edit it. |
 | `install-skill` exits `3` | A different `using-skills-mapper` already in the store; re-run with `--force` to replace it. |
+| `sm map: unknown skills: <names>` / `unusable skills: <names>` | A profile name is not in the store, or is there but non-conforming. Nothing was placed; fix the name or the store entry. |
+| A deleted map folder still shows as `mapped target` | Expected: the record outlives the folder (no unmap verb yet). Harmless. |
 | Something looks off | Start with `sm status`, then `sm sync --dry-run`. |
 
 ## Installing this skill from a source folder
