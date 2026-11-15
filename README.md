@@ -13,6 +13,20 @@ by hand into every other agent's folder. skills-mapper keeps one agent-neutral
 store out to the agents, and `ms` is the on-ramp that copies the skills you
 already have into the store.
 
+> [!WARNING]
+> **Claude Code signed in with a claude.ai account: `sm` cannot control which
+> skills it sees.** On top of whatever `sm` places, Claude Code always loads
+> the skills attached to your claude.ai account (`claude.ai sync` in
+> `/skills`), the plugins your organization pushes (`locked by plugin`), and its
+> own built-in skills. That holds with a separate `CLAUDE_CONFIG_DIR` and inside
+> a container, because those skills come with the login, not from a folder. So
+> `sm sync` still delivers your store to Claude Code, but neither it nor
+> `sm map` can keep those other skills out, and a "only these skills" run is not
+> possible. Signing in with a Console API key (`ANTHROPIC_API_KEY`) instead
+> should avoid the account skills, but that is untested. Agents that load only
+> what is on disk, such as pi, do not have this problem. See
+> [Run an agent with only one skill](#run-an-agent-with-only-one-skill).
+
 > **Tested on Linux only.** macOS builds but has not been tested; Windows is
 > unsupported. See [Limitations](#limitations).
 
@@ -1142,6 +1156,10 @@ store is what the agent gets.
 - `sm map` does not yet refuse an empty flag value the way the other verbs do:
   `--store ""` falls back to the default store and `--profile ""` counts as not
   given.
+- Claude Code signed in with a claude.ai account loads the account's synced
+  skills, organization-pushed plugins and its built-in skills on top of
+  anything `sm` places, so `sm` cannot limit what it sees (see the warning at
+  the top and [Run an agent with only one skill](#run-an-agent-with-only-one-skill)).
 - Mapping into a directory that `agents.toml` also lists makes `sm sync` and
   `sm map` reconcile the same folder toward different sets: each run undoes the
   other's selection. Map into folders `sm sync` does not manage.
