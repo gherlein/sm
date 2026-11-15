@@ -146,7 +146,7 @@ This registry is used only to *suggest* entries during `sm probe` and
 | `claude-code` | `~/.claude/skills` | `~/.claude` exists or `claude` on `PATH` |
 | `copilot` | `~/.copilot/skills` | `~/.copilot` exists or `copilot` on `PATH` |
 | `hax` | `~/.config/hax/skills` | `~/.config/hax` exists or `hax` on `PATH` |
-| `pi` | `~/.pi-go/skills` | `~/.pi-go` exists or `pi` on `PATH` |
+| `pi` | `~/.pi/agent/skills` | `~/.pi/agent` exists or `pi` on `PATH` |
 | `oh-my-pi` | `~/.config/agents/skills` | `~/.config/agents` exists or `omp` on `PATH` |
 | `kit` | `~/.config/kit/skills` | `~/.config/kit` exists or `kit` on `PATH` |
 

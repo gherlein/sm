@@ -267,7 +267,7 @@ Well-known agents `sm probe` / `sm init` know about:
 | `claude-code` | `~/.claude/skills` | `claude` |
 | `copilot` | `~/.copilot/skills` | `copilot` |
 | `hax` | `~/.config/hax/skills` | `hax` |
-| `pi` | `~/.pi-go/skills` | `pi` |
+| `pi` | `~/.pi/agent/skills` | `pi` |
 | `oh-my-pi` | `~/.config/agents/skills` | `omp` |
 | `kit` | `~/.config/kit/skills` | `kit` |
 

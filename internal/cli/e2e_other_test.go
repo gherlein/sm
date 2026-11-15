@@ -515,7 +515,7 @@ func TestProbe(t *testing.T) {
 		fixture := newEnv(t)
 		mkdir(t, filepath.Join(fixture.home, ".claude"))
 		mkdir(t, filepath.Join(fixture.home, ".copilot"))
-		mkdir(t, filepath.Join(fixture.home, ".pi-go"))
+		mkdir(t, filepath.Join(fixture.home, ".pi", "agent"))
 		mustRun(t, "probe", "--yes")
 		content, _ := os.ReadFile(fixture.configPath)
 		for _, want := range []string{"claude-code", "copilot", "pi "} {

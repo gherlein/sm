@@ -51,7 +51,9 @@ func Registry() []Known {
 		{Name: "claude-code", DefaultDir: "~/.claude/skills", ConfigDir: "~/.claude", Binary: "claude"},
 		{Name: "copilot", DefaultDir: "~/.copilot/skills", ConfigDir: "~/.copilot", Binary: "copilot"},
 		{Name: "hax", DefaultDir: "~/.config/hax/skills", ConfigDir: "~/.config/hax", Binary: "hax"},
-		{Name: "pi", DefaultDir: "~/.pi-go/skills", ConfigDir: "~/.pi-go", Binary: "pi"},
+		// pi (pi-coding-agent) keeps its user skills under its agent dir,
+		// ~/.pi/agent (PI_CODING_AGENT_DIR overrides it at run time).
+		{Name: "pi", DefaultDir: "~/.pi/agent/skills", ConfigDir: "~/.pi/agent", Binary: "pi"},
 		{Name: "oh-my-pi", DefaultDir: "~/.config/agents/skills", ConfigDir: "~/.config/agents", Binary: "omp"},
 		{Name: "kit", DefaultDir: "~/.config/kit/skills", ConfigDir: "~/.config/kit", Binary: "kit"},
 	}

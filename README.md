@@ -589,7 +589,7 @@ $ cat ~/.config/skills-mapper/agents.toml
 # claude-code = "~/.claude/skills"
 # copilot = "~/.copilot/skills"
 # hax = "~/.config/hax/skills"
-# pi = "~/.pi-go/skills"
+# pi = "~/.pi/agent/skills"
 # oh-my-pi = "~/.config/agents/skills"
 # kit = "~/.config/kit/skills"
 ```
@@ -640,9 +640,15 @@ wrong thing:
 | `claude-code` | `~/.claude/skills` | `~/.claude` exists or `claude` is on `PATH` |
 | `copilot` | `~/.copilot/skills` | `~/.copilot` exists or `copilot` is on `PATH` |
 | `hax` | `~/.config/hax/skills` | `~/.config/hax` exists or `hax` is on `PATH` |
-| `pi` | `~/.pi-go/skills` | `~/.pi-go` exists or `pi` is on `PATH` |
+| `pi` | `~/.pi/agent/skills` | `~/.pi/agent` exists or `pi` is on `PATH` |
 | `oh-my-pi` | `~/.config/agents/skills` | `~/.config/agents` exists or `omp` is on `PATH` |
 | `kit` | `~/.config/kit/skills` | `~/.config/kit` exists or `kit` is on `PATH` |
+
+Earlier releases listed pi as `~/.pi-go/skills`, which the current pi
+(`pi-coding-agent`) never reads. If your `agents.toml` still has that line,
+change it to `pi = "~/.pi/agent/skills"`, run `sm clean --orphans` to remove
+the links left in the old folder, then `sm sync`. If you set
+`PI_CODING_AGENT_DIR`, use `<that dir>/skills` instead.
 
 ## Command reference
 
@@ -786,7 +792,7 @@ $ sm status
 store: 5 skills (~/.local/share/skills)
 claude-code    owned=4 missing=1 unmanaged=0 dangling=0  ~/.claude/skills
 copilot        owned=4 missing=1 unmanaged=0 dangling=0  ~/.copilot/skills
-orphaned target: ~/.pi-go/skills (4 entries)
+orphaned target: ~/.pi/agent/skills (4 entries)
 ```
 
 | Column | Meaning |
@@ -832,9 +838,9 @@ claude-code: removed copy code-review
 ...
 clean: claude-code -3   copilot -3
 $ sm clean --orphans
-~/.pi-go/skills: unlinked code-review
+~/.pi/agent/skills: unlinked code-review
 ...
-clean: ~/.pi-go/skills -4
+clean: ~/.pi/agent/skills -4
 $ sm clean --orphans
 clean: no orphaned targets
 ```

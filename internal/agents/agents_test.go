@@ -73,7 +73,7 @@ func TestLoad_Valid(t *testing.T) {
 }
 
 func TestLoad_CommentsIgnored(t *testing.T) {
-	path := writeConfig(t, "# top comment\n[agents]\n# pi = \"~/.pi-go/skills\"\nkit = \"/abs/kit\"\n")
+	path := writeConfig(t, "# top comment\n[agents]\n# pi = \"~/.pi/agent/skills\"\nkit = \"/abs/kit\"\n")
 	cfg, err := Load(path)
 	if err != nil {
 		t.Fatalf("Load: %v", err)
@@ -161,6 +161,20 @@ func TestRegistry_HasKnownAgents(t *testing.T) {
 	if len(Registry()) < 6 {
 		t.Fatalf("registry too small: %d", len(Registry()))
 	}
+}
+
+// TestRegistry_PiUsesAgentDir pins pi to pi-coding-agent's real skills
+// directory; the old ~/.pi-go/skills is a folder current pi never reads.
+func TestRegistry_PiUsesAgentDir(t *testing.T) {
+	for _, known := range Registry() {
+		if known.Name == "pi" {
+			if known.DefaultDir != "~/.pi/agent/skills" || known.ConfigDir != "~/.pi/agent" || known.Binary != "pi" {
+				t.Fatalf("unexpected pi entry: %+v", known)
+			}
+			return
+		}
+	}
+	t.Fatal("pi missing from registry")
 }
 
 func TestExpand_UndefinedVarIsError(t *testing.T) {
