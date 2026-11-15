@@ -195,6 +195,7 @@ is safe to run any time (use `sm sync --dry-run` to preview).
 | Check that all is well | `sm status`: every agent should show `missing=0 unmanaged=0 dangling=0`. Warnings about store entries are printed after the `store:` line. |
 | Adopt skills an agent made itself | `ms <agent skills folder>`, then `sm sync` (see [Getting skills into the store](#getting-skills-into-the-store)). |
 | Give a one-shot run only some skills | `sm map --profile <name> <folder>` — symlink just the named skills from the store into that folder (see [Map a subset into a folder](#map-a-subset-into-a-folder)). |
+| Remove a mapped folder's skills | `sm unmap <folder>` — removes what `sm map` placed there and forgets the folder. |
 | Undo everything | `sm clean`, then see [Uninstall](#uninstall). |
 
 When something looks off, start with `sm status`, then
@@ -258,13 +259,25 @@ a hand-placed file): re-mapping the same folder with a smaller profile removes
 the skills that left it. It needs no `agents.toml`, takes the same state lock as
 `sync` and `clean` (not in a dry run), and records the folder in the state file
 marked as mapped, so `sm status` lists it as `mapped target: <dir> (<n>
-entries)` and neither `sm clean` nor `sm clean --orphans` touches it. Flags may
+entries; undo with: sm unmap <dir>)` and neither `sm clean` nor
+`sm clean --orphans` touches its links. Flags may
 come before or after the folder; give exactly one of `--profile`, `--from` or
 trailing names. Duplicate names in a profile are collapsed, with a warning.
 
-To tear a mapped folder down, delete it. Its record stays in the state file
-and `sm status` keeps listing it (see [Limitations](#limitations)); a later
-`sm map` into the same path picks the record up again.
+To tear a mapped folder down, run `sm unmap <folder>`. It removes the links and
+copies `sm map` placed there (identity-checked, so anything you put there by
+hand stays), forgets the folder, and prints `unmap: -N`. The folder itself is
+left in place. It refuses a folder that is not a mapped target, so it can never
+strip an agent directory `sm sync` manages:
+
+```sh
+sm unmap ./run                            # unmap: -2
+```
+
+If you delete a mapped folder instead, its record stays behind and `sm status`
+shows `mapped target: <dir> (folder gone; drop the record with: sm clean
+--orphans)`. `sm clean --orphans` drops such records, and `sm unmap` on the
+deleted path does too.
 
 ## Concepts
 
@@ -502,6 +515,7 @@ Flags accept one or two dashes.
 | | `--copy` | Copy mode: real directories instead of symlinks. |
 | | `--dry-run` | Report the counts; change nothing. |
 | | `--store DIR` | Use `DIR` as the store. |
+| `sm unmap <folder>` | | Remove the links and copies `sm map` placed in `folder` (identity-checked) and forget it; the folder itself stays. Refuses a folder that is not a mapped target. See [Map a subset into a folder](#map-a-subset-into-a-folder). |
 | `sm status` | | Read-only report per agent. Never changes anything. |
 | | `--store DIR`, `--agent-home DIR` | As for `sync`, to inspect that layout. |
 | `sm clean` | | Remove every link and copy `sm` recorded, for every agent. |
@@ -539,11 +553,12 @@ widens what a command touches:
   empty`. An empty `ms` source or destination is refused the same way.
 - `sync`, `status`, `clean`, `probe` and `init` take no positional arguments;
   `sm clean a` and `sm sync now --dry-run` fail with `sm clean: unexpected
-  argument "a"` instead of cleaning everything or syncing for real. `sm map` is
-  the one verb that takes positionals (the folder, then any skill names), and
-  it honors its flags in any position, so `sm map ./run rebuild --dry-run`
-  stays a dry run. Giving it no folder, no selection, or more than one kind of
-  selection is a usage error (exit `2`).
+  argument "a"` instead of cleaning everything or syncing for real. `sm map` and
+  `sm unmap` are the verbs that take positionals. `sm map` takes the folder,
+  then any skill names, and honors its flags in any position, so
+  `sm map ./run rebuild --dry-run` stays a dry run. Giving it no folder, no
+  selection, or more than one kind of selection is a usage error (exit `2`).
+  `sm unmap` takes exactly one folder; anything else is a usage error.
 
 The summary lines in `sm -h` and `ms -h` are short: `sm -h` says `sync` will
 "link every store skill into each agent directory" and `status` reports
@@ -640,7 +655,8 @@ Without `--agent-home`, `status` also lists directories in the state file that
 | `orphaned target: <dir> (<n> entries)` | An agent removed from `agents.toml`. | Removes its `sm` entries (identity-checked) and forgets it. |
 | `aliased target: <dir> (same directory as agent <name>)` | Another spelling (via a symlink) of a listed agent's directory, for example after you changed how the path is written. The next `sm sync` adopts its verified records (see [If you respell an agent directory](#if-you-respell-an-agent-directory)). | Merges the records that still verify into the listed agent (`merged <n> record(s) from <old> into <dir>`) and drops the duplicate (`<old>: same directory as agent <a>; dropped its duplicate record, removed nothing`); removes nothing on disk. |
 | `provisioned target: <dir> (<n> entries; clean with: sm clean --agent-home <root>)` | A layout made with `--agent-home`, shown this way only while the layout's path still ends with a configured agent's home-relative path (for example `.claude/skills`); this works whether the agent is spelled through `$HOME` or, when `$HOME` is a symlink, through its resolved path. Once you remove the agent, or respell its directory so that no longer matches, the same directory shows as `orphaned target`. | Leaves it alone and prints `<dir>: provisioned with --agent-home; left alone (clean with: sm clean --agent-home <root>)`; run the printed command. If it shows as an orphan, `sm clean --orphans` removes its `sm` entries; to be explicit, run `sm clean --agent-home <root>` first. |
-| `mapped target: <dir> (<n> entries)` | A folder made with `sm map`. | Leaves it alone and prints `<dir>: mapped target (sm map); left alone (deleting the folder removes its links; the record stays)`. Deleting the directory removes the links but not the record (see [Limitations](#limitations)). |
+| `mapped target: <dir> (<n> entries; undo with: sm unmap <dir>)` | A folder made with `sm map`. | Leaves it alone and prints `<dir>: mapped target (sm map); left alone (undo with: sm unmap <dir>)`; run the printed command to remove it. |
+| `mapped target: <dir> (folder gone; drop the record with: sm clean --orphans)` | A folder made with `sm map` that has since been deleted. | Drops the record and prints `<dir>: mapped folder no longer exists; dropped its record, removed nothing`. |
 | `unclassifiable target: <dir> (<reason>)` | A record whose path cannot be resolved. | Leaves it alone. |
 
 ### `sm clean`
@@ -679,7 +695,8 @@ Other `--orphans` lines, one per target it leaves or tidies:
 merged 1 record(s) from ~/.claude/skills into ~/cl2/skills
 ~/.claude/skills: same directory as agent claude-code; dropped its duplicate record, removed nothing
 ~/trial/.claude/skills: provisioned with --agent-home; left alone (clean with: sm clean --agent-home ~/trial)
-/home/you/run: mapped target (sm map); left alone (deleting the folder removes its links; the record stays)
+/home/you/run: mapped target (sm map); left alone (undo with: sm unmap /home/you/run)
+/home/you/old-run: mapped folder no longer exists; dropped its record, removed nothing
 ```
 
 The agent directories themselves are left in place (empty).
@@ -858,7 +875,7 @@ follows a symlinked entry into what it points at.
   devices are never copied.
 - Overlaps are refused: an agent directory overlapping the store, an `ms`
   destination overlapping its source, and a skill overlapping its destination.
-- One run at a time: `sm sync`, `sm map`, `sm clean` and `ms` all take the state lock
+- One run at a time: `sm sync`, `sm map`, `sm unmap`, `sm clean` and `ms` all take the state lock
   (`state.json.lock`), and `ms` also takes its own ledger lock
   (`ingest-log.json.lock`), always in that order. A second concurrent run fails
   at once: `another sm or ms process is running (lock <path>)` for the state
@@ -962,11 +979,10 @@ store is what the agent gets.
   detected swap names whatever is at that path now; inspect it before deleting.
 - `sm` does not authenticate the store, and a few residual races remain; see
   [Safety and trust model](#safety-and-trust-model).
-- A mapped folder's record outlives the folder. There is no unmap command, and
-  neither `sm clean` nor `sm clean --orphans` drops a `mapped target`, so a
-  deleted map folder keeps appearing in `sm status` (with its old entry count)
-  until the state file is removed. Sub-agent runs that map into a fresh
-  temporary folder each time accumulate one record per run.
+- A mapped folder you delete by hand keeps its state record until the next
+  `sm clean --orphans` (or `sm unmap` on its path). Sub-agent runs that map into
+  a fresh temporary folder each time should either `sm unmap` it or run
+  `sm clean --orphans` now and then.
 - `sm map` does not yet refuse an empty flag value the way the other verbs do:
   `--store ""` falls back to the default store and `--profile ""` counts as not
   given.
@@ -1022,7 +1038,7 @@ store is what the agent gets.
 | `refusing to copy <src> to <dst>: the destination overlaps the source` | A store skill is a symlink to the agent directory or to a parent of it. Remove the link. |
 | `warning: <a>: previous version kept at <path>; remove it manually (...)` | The new copy is in place; delete the `.sm-old-*` directory by hand. |
 | `warning: <a>: could not remove orphaned stage <path>: ...` | Delete that `.sm-stage-*` directory by hand. |
-| `another sm or ms process is running (lock <path>)` | Another `sm sync`, `sm clean` or `ms` run holds the state lock. Wait for it. If none is running, the lock is not held (it is a kernel lock); retry. |
+| `another sm or ms process is running (lock <path>)` | Another `sm sync`, `sm map`, `sm unmap`, `sm clean` or `ms` run holds the state lock. Wait for it. If none is running, the lock is not held (it is a kernel lock); retry. |
 | `state <path>: unsupported state version ...; refusing to use or overwrite it` (or `has no targets object`, `target directory "<dir>" is not a clean path`, `parse state`, `invalid recorded name`, `empty recorded store path`, `is not absolute`) | The state file was written by another release or edited. Restore it, or move it aside and rebuild (see below). |
 | `refusing target dir <path>: world-writable (fix with: chmod o-w '<path>')` / `not owned by the current user (the directory must be owned by you)` / `not a directory` | Fix the directory's owner or mode. `sync` adds `sync stops at this agent: fix the directory, or remove agent <a> from agents.toml`; `clean` adds the `sm clean --agent <other>` hint for the other agents. `clean` and link-mode removals refuse in such a directory too. |
 | status `orphaned`, `aliased`, `provisioned`, `unclassifiable target` lines | See the [`status` labels](#sm-status). A `--agent-home` layout is `provisioned` only while its agent is configured; after the agent is removed it is `orphaned` and `sm clean --orphans` removes its `sm` entries. |
@@ -1088,7 +1104,7 @@ whatever is left under the old spelling.
 | `ms: parse ingest ledger <path>: ...` / `unsupported version` | The ledger is damaged; `ms` refuses to write. Repair or move it aside. |
 | `ms: skills were written to <dest> but the ingest log could not be saved: ...` | The skills are in the store; fix the ledger location and note their origin. |
 | `ms: refusing target dir <path>: world-writable (fix with: chmod o-w '<path>')` (or `not owned by the current user`, `not a directory`) | The destination must be owned by you and not world-writable. Fix it, then rerun. |
-| `ms: another sm or ms process is running (lock <state path>)` | `sm sync`, `sm clean` or another `ms` holds the state lock. Wait, then rerun. |
+| `ms: another sm or ms process is running (lock <state path>)` | `sm sync`, `sm map`, `sm unmap`, `sm clean` or another `ms` holds the state lock. Wait, then rerun. |
 | `ms: another ms process is running (lock <ledger path>)` | Another `ms` holds the ledger lock. Wait, then rerun. |
 
 ## Uninstall
@@ -1097,7 +1113,7 @@ whatever is left under the old spelling.
 # 1. Remove every link and copy sm made. Do this before deleting the state file.
 sm status                          # note any "provisioned target" and "mapped target" lines
 sm clean --agent-home <root>       # once per provisioned target, if any
-rm -r <dir>                        # once per mapped target you no longer want (sm clean leaves them)
+sm unmap <dir>                     # once per mapped target (sm clean leaves them)
 sm clean
 
 # 2. Optionally give agents real directories again, from your backup or the store:
@@ -1127,7 +1143,7 @@ requires.
 | `$XDG_CONFIG_HOME/skills-mapper/agents.toml` | Agents to mirror into. |
 | `$XDG_CONFIG_HOME/skills-mapper/profiles/<name>.toml` | `sm map --profile <name>` skill lists (`skills = [...]`). Hand-written; `sm` never creates them. |
 | `$XDG_DATA_HOME/skills-mapper/state.json` | `sm`'s record of the links and copies it owns (`0600`). |
-| `$XDG_DATA_HOME/skills-mapper/state.json.lock` | Lock taken by `sm sync`, `sm map`, `sm clean` and `ms` (a real run), so they never overlap. |
+| `$XDG_DATA_HOME/skills-mapper/state.json.lock` | Lock taken by `sm sync`, `sm map`, `sm unmap`, `sm clean` and `ms` (a real run), so they never overlap. |
 | `$XDG_DATA_HOME/skills-mapper/ingest-log.json` | `ms` ingest ledger (`0600`). |
 | `$XDG_DATA_HOME/skills-mapper/ingest-log.json.lock` | Lock taken by `ms` after the state lock; `sm` never takes it. |
 | `<agent dir>/<name>/.sm-copy` | Copy-mode provenance marker. |

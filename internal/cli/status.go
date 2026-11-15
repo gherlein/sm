@@ -173,7 +173,11 @@ func doStatus(cfg agents.Config, storeDir, statePath string, orphanScope bool, o
 		case orphanTarget:
 			fmt.Fprintf(out, "orphaned target: %s (%d entries)\n", target.dir, entries)
 		case mappedTarget:
-			fmt.Fprintf(out, "mapped target: %s (%d entries)\n", target.dir, entries)
+			if mappedFolderGone(target.dir) {
+				fmt.Fprintf(out, "mapped target: %s (folder gone; drop the record with: sm clean --orphans)\n", target.dir)
+				continue
+			}
+			fmt.Fprintf(out, "mapped target: %s (%d entries; undo with: sm unmap %s)\n", target.dir, entries, target.dir)
 		case unclassifiableTarget:
 			fmt.Fprintf(out, "unclassifiable target: %s (%s)\n", target.dir, target.reason)
 		default:

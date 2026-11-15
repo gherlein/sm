@@ -51,6 +51,11 @@ var commands = map[string]command{
 		flagSummary: "[--profile NAME | --from PATH] [--copy] [--dry-run] [--store DIR] <target-dir> [skill ...]",
 		run:         runMap,
 	},
+	"unmap": {
+		summary:     "remove sm map's links and copies from a folder and forget it",
+		flagSummary: "<target-dir>",
+		run:         runUnmap,
+	},
 	"init": {
 		summary:     "write a starter agents.toml",
 		flagSummary: "(no flags)",

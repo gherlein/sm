@@ -156,6 +156,7 @@ never gates sync.
 | --- | --- | --- |
 | `sm sync` | `--dry-run`, `--copy`, `--store DIR`, `--agent-home DIR`, `--allow-empty` | Enumerate the store, adopt alias records, link (or copy) into each enabled agent, reconcile. The everyday verb. |
 | `sm map <folder> [skill ...]` | `--profile NAME`, `--from PATH`, `--copy`, `--dry-run`, `--store DIR` | Select a named subset of the store and link (or copy) it into one literal folder, reconciled; mark the folder as mapped in state. |
+| `sm unmap <folder>` | (none) | Remove the entries `sm map` placed in one mapped folder (identity-checked) and drop its state record; refuse a folder not marked mapped. |
 | `sm status` | `--store DIR`, `--agent-home DIR` | Read-only report: store skill count and warnings; per agent `owned`, `missing`, `unmanaged`, `dangling`; without `--agent-home`, the unmapped state targets. |
 | `sm clean` | `--agent NAME`, `--agent-home DIR`, `--orphans` | Remove the entries `sm` recorded and can still identify, for every agent, one agent, a re-rooted layout, or only the unmapped targets. |
 | `sm probe` | `--yes`, `--dry-run` | Detect installed agents and offer to add each unlisted one to `agents.toml`. |
@@ -172,7 +173,8 @@ CLI conventions:
   `status`, `clean`, `probe` and `init` take no positional arguments
   (`sm <cmd>: unexpected argument "<x>"`), because flag parsing stops at the
   first positional and `sm clean a` or `sm sync now --dry-run` would otherwise
-  silently ignore the rest. `sm map` is the one verb with positionals; it
+  silently ignore the rest. `sm map` and `sm unmap` are the verbs with
+  positionals (`unmap` takes exactly one, the folder); `map`
   parses them itself, re-parsing flags after each positional, so a flag after
   the folder (`sm map ./run x --dry-run`) is still honored. `sm map` does not
   yet apply the empty-value check (see
@@ -330,6 +332,27 @@ The summary is `map: +N -M` (link mode) or `map: +N ~F -M` (copy mode).
 mapped and listed in `agents.toml` is pulled back and forth by each run; map
 into folders `sync` does not manage.
 
+### `sm unmap`
+
+`sm unmap <folder>` undoes `sm map` for one folder. It reads no `agents.toml`.
+
+1. **Target.** The folder is resolved exactly as `map` resolves it (absolute,
+   symlink-resolved), so the state key matches. A missing folder still
+   resolves, so unmapping a deleted folder works.
+2. **Guard.** Under the state lock, the key must be recorded and marked
+   `mapped`. An unrecorded folder fails with `<dir> is not a mapped target
+   (nothing recorded for it)`; a recorded but unmarked one (a `sync` target)
+   fails with `<dir> is not a mapped target; it was placed by sm sync (use sm
+   clean)`. Both exit `1` and touch nothing.
+3. **Remove.** The same `cleanTarget` that `clean` uses removes each recorded
+   link and copy that still verifies by identity, leaves anything else, and
+   drops the key. A mid-run failure persists the remaining records with
+   `mapped` kept, so the target stays classified as mapped.
+4. **Leave the folder.** The folder itself is not removed; it may hold other
+   files.
+
+The summary is `unmap: -N`.
+
 ### `sm status`
 
 Never changes anything and takes no lock. Columns per agent:
@@ -350,7 +373,8 @@ is skipped under `--agent-home`):
 | `orphaned target: <dir> (<n> entries)` | Not related to any configured agent: an agent removed from `agents.toml`. |
 | `aliased target: <dir> (same directory as agent <name>)` | Resolves to the real directory of a configured agent: an older spelling. |
 | `provisioned target: <dir> (<n> entries; clean with: sm clean --agent-home <root>)` | Ends with a configured agent's home-relative path (longest match wins): a `--agent-home` layout. |
-| `mapped target: <dir> (<n> entries)` | Marked `mapped` in state: a folder `sm map` placed into. Checked before the orphan case. |
+| `mapped target: <dir> (<n> entries; undo with: sm unmap <dir>)` | Marked `mapped` in state: a folder `sm map` placed into. Checked before the orphan case. |
+| `mapped target: <dir> (folder gone; drop the record with: sm clean --orphans)` | As above, but the folder no longer exists. |
 | `unclassifiable target: <dir> (<reason>)` | The key cannot be resolved (for example a symlink loop or an unreadable parent). |
 
 Classification uses the agents configured now: a `--agent-home` layout of an
@@ -386,9 +410,11 @@ place.
   (`<old>: same directory as agent <a>; dropped its duplicate record, removed
   nothing`), removing nothing on disk; **provisioned** targets are reported
   (`<dir>: provisioned with --agent-home; left alone (clean with: sm clean
-  --agent-home <root>)`) and left alone; **mapped** targets are reported
-  (`<dir>: mapped target (sm map); left alone (remove the directory to reclaim
-  it)`) and left alone, and so are **unclassifiable** ones. A plain `clean`
+  --agent-home <root>)`) and left alone; **mapped** targets whose folder
+  exists are reported (`<dir>: mapped target (sm map); left alone (undo with:
+  sm unmap <dir>)`) and left alone, while those whose folder is gone have their
+  record dropped (`<dir>: mapped folder no longer exists; dropped its record,
+  removed nothing`); **unclassifiable** targets are left alone. A plain `clean`
   walks only configured agents, so it never touches a mapped folder either. With nothing to do it prints
   `clean: no orphaned targets`. `--orphans` cannot be combined with `--agent`
   or `--agent-home` (usage error, exit `2`).
@@ -598,8 +624,8 @@ One central file at `$XDG_DATA_HOME/skills-mapper/state.json` (default
   entry was made; `copies` is omitted when empty.
 - **`mapped`** (omitted unless true) marks a target `sm map` created. It only
   changes classification (`status`, `clean --orphans`); placement and
-  reconcile treat the target like any other. Nothing clears it: deleting the
-  folder leaves the record, which `status` keeps listing.
+  reconcile treat the target like any other. `sm unmap` drops the record, and
+  so does `clean --orphans` once the folder no longer exists.
 - **Version.** `version` must be `1`. Any other value, a missing version, or a
   `null` document is refused (`unsupported state version ...; refusing to use or
   overwrite it`), as are relative keys, keys that are not clean paths
@@ -614,7 +640,7 @@ One central file at `$XDG_DATA_HOME/skills-mapper/state.json` (default
   The state file is written `0600` via a temp file and rename, so a crash never
   leaves a truncated file; there is no `fsync` before the rename, so a power
   loss can still lose the latest save.
-- **Lock.** `sync` (not in dry run), `map` (not in dry run), `clean` and `ms` (not in dry run) take an
+- **Lock.** `sync` (not in dry run), `map` (not in dry run), `unmap`, `clean` and `ms` (not in dry run) take an
   exclusive, non-blocking `flock` on `state.json.lock` (`0600`, opened with
   `O_NOFOLLOW`) for the whole load-modify-save (for `ms`, the whole write), so
   they never overlap. The lock is labelled with the tools that take it; a
@@ -806,6 +832,8 @@ only `~`; a `$VAR` stays literal.
 | State file of another version, without `targets`, with an unclean key, or malformed | Refuse to use or overwrite it; exit `1`. |
 | `sm map` names a skill absent from, or non-conforming in, the store | `sm map: unknown skills: ...; unusable skills: ...`; place nothing; exit `1`. |
 | `sm map` with no folder, no selection, or more than one selection source | Print `sm map` usage to stderr; exit `2`. |
+| `sm unmap` on a folder that is not a mapped target | `sm unmap: <dir> is not a mapped target ...`; touch nothing; exit `1`. |
+| `sm unmap` with no folder or more than one | Print `sm unmap` usage to stderr; exit `2`. |
 | Another `sm sync`/`map`/`clean`/`ms` running | `another sm or ms process is running (lock <path>)` for the state lock; `another ms process is running (lock <path>)` for the ledger lock; exit `1`. |
 | Old version of a refreshed copy cannot be deleted | Warn `previous version kept at <path>; remove it manually`; continue. |
 | Failure part way through an agent | Save the progress made so far, report the error, exit `1`; re-running `sm sync` completes the job. |
@@ -836,11 +864,13 @@ All tests use the standard `testing` package and run only through the Makefile
   lock), and the command line (`--`, `-h`, literal `$VAR`).
 - **Integration, hermetic:** `sync`, `map`, `status`, `clean` and `probe`
   driven end to end over temp `HOME` / XDG trees, covering alias adoption,
-  orphan classification, `clean --orphans` (including that it leaves mapped
-  targets), the empty-store guard and mixed-mode directories. `map` is covered
+  orphan classification, `clean --orphans` (including that it leaves live
+  mapped targets and drops the records of deleted ones), the empty-store guard and mixed-mode directories. `map` is covered
   for each selection source, flag-after-folder parsing, fail-closed on unknown
   and unusable names, shrinking reconcile, unmanaged protection, the literal
-  target, the `mapped` marker, and copy mode (`internal/cli/map_test.go`);
+  target, the `mapped` marker, and copy mode; `unmap` for link and copy mode,
+  hand-placed files surviving, a deleted folder, and refusing unrecorded and
+  `sync` targets (`internal/cli/map_test.go`);
   `internal/profile` and `internal/mapsel` have unit tests.
 - **Black-box regression suite:** `internal/cli/regress_test.go` and
   `internal/mscli/regress_test.go` drive only `cli.Run` / `mscli.Run` and
@@ -943,8 +973,9 @@ These are accepted, not defended against:
   and `--profile ""` / `--from ""` count as not given. It cannot widen into a
   configured agent directory (the target is always the named folder), but it
   is inconsistent with the other verbs.
-- **Mapped records persist.** See [Open / future](#open--future): nothing drops
-  a mapped target's record.
+- **Mapped records of deleted folders.** A mapped folder deleted by hand keeps
+  its record until `clean --orphans` or `unmap` drops it, so per-run folders
+  accumulate records between sweeps.
 
 ## Migration from the earlier design
 
@@ -969,11 +1000,6 @@ Removed packages: `config` (`skills.toml`), `cache` (clone/pull), `resolve`
 - The `add`, `remove`, `update`, and `link` commands as source-manifest verbs.
 
 ## Open / future
-
-- **Unmapping.** A mapped target's record is never dropped (deleting the folder
-  leaves it, and no verb removes it), so ephemeral per-run folders accumulate
-  records. Candidates: an `sm unmap <folder>`, or letting `clean --orphans`
-  drop a mapped record whose folder no longer exists.
 
 - **Project scope** — a project-local store fanning out into a repo's per-project
   agent directories.

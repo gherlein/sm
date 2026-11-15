@@ -288,3 +288,186 @@ func TestMapWarnsOnDuplicateNames(t *testing.T) {
 		t.Errorf("stdout %q lacks 'map: +2 -0'", out.String())
 	}
 }
+
+func TestUnmapRemovesPlacedEntriesAndRecord(t *testing.T) {
+	_, runDir := mapFixture(t)
+	var out, errb bytes.Buffer
+	if code := Run([]string{"map", runDir, "rebuild", "lint"}, &out, &errb); code != 0 {
+		t.Fatalf("map exit=%d stderr=%s", code, errb.String())
+	}
+	handPlaced := filepath.Join(runDir, "notes.txt")
+	if err := os.WriteFile(handPlaced, []byte("mine"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	out.Reset()
+	errb.Reset()
+	if code := Run([]string{"unmap", runDir}, &out, &errb); code != 0 {
+		t.Fatalf("unmap exit=%d stderr=%s", code, errb.String())
+	}
+	if !strings.Contains(out.String(), "unmap: -2") {
+		t.Errorf("stdout %q lacks 'unmap: -2'", out.String())
+	}
+	for _, name := range []string{"rebuild", "lint"} {
+		if _, err := os.Lstat(filepath.Join(runDir, name)); err == nil {
+			t.Errorf("%s still present after unmap", name)
+		}
+	}
+	if _, err := os.Stat(handPlaced); err != nil {
+		t.Errorf("hand-placed file removed by unmap: %v", err)
+	}
+	if _, err := os.Stat(runDir); err != nil {
+		t.Errorf("unmap removed the folder itself: %v", err)
+	}
+	statePath := filepath.Join(os.Getenv("XDG_DATA_HOME"), "skills-mapper", "state.json")
+	after, err := state.Load(statePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(after.Targets) != 0 {
+		t.Errorf("state still records targets after unmap: %v", after.Targets)
+	}
+}
+
+func TestUnmapCopyMode(t *testing.T) {
+	_, runDir := mapFixture(t)
+	var out, errb bytes.Buffer
+	if code := Run([]string{"map", "--copy", runDir, "rebuild"}, &out, &errb); code != 0 {
+		t.Fatalf("map exit=%d stderr=%s", code, errb.String())
+	}
+	out.Reset()
+	if code := Run([]string{"unmap", runDir}, &out, &errb); code != 0 {
+		t.Fatalf("unmap exit=%d stderr=%s", code, errb.String())
+	}
+	if !strings.Contains(out.String(), "unmap: -1") {
+		t.Errorf("stdout %q lacks 'unmap: -1'", out.String())
+	}
+	if _, err := os.Lstat(filepath.Join(runDir, "rebuild")); err == nil {
+		t.Error("copied skill still present after unmap")
+	}
+}
+
+func TestUnmapDeletedFolderDropsRecord(t *testing.T) {
+	_, runDir := mapFixture(t)
+	var out, errb bytes.Buffer
+	if code := Run([]string{"map", runDir, "rebuild"}, &out, &errb); code != 0 {
+		t.Fatalf("map exit=%d stderr=%s", code, errb.String())
+	}
+	if err := os.RemoveAll(runDir); err != nil {
+		t.Fatal(err)
+	}
+	out.Reset()
+	if code := Run([]string{"unmap", runDir}, &out, &errb); code != 0 {
+		t.Fatalf("unmap exit=%d stderr=%s", code, errb.String())
+	}
+	if !strings.Contains(out.String(), "unmap: -0") {
+		t.Errorf("stdout %q lacks 'unmap: -0'", out.String())
+	}
+	if dir, _ := mappedStateTargetOrEmpty(t); dir != "" {
+		t.Errorf("record for %s survived unmap of a deleted folder", dir)
+	}
+}
+
+func TestUnmapRefusesUnrecordedFolder(t *testing.T) {
+	_, runDir := mapFixture(t)
+	if err := os.MkdirAll(runDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	var out, errb bytes.Buffer
+	if code := Run([]string{"unmap", runDir}, &out, &errb); code != exitError {
+		t.Fatalf("exit=%d, want %d", code, exitError)
+	}
+	if !strings.Contains(errb.String(), "not a mapped target") {
+		t.Errorf("stderr %q lacks 'not a mapped target'", errb.String())
+	}
+}
+
+// TestUnmapRefusesSyncTarget proves unmap cannot strip a directory sm sync
+// manages: a recorded target that is not marked Mapped is refused untouched.
+func TestUnmapRefusesSyncTarget(t *testing.T) {
+	storeDir, runDir := mapFixture(t)
+	statePath := filepath.Join(os.Getenv("XDG_DATA_HOME"), "skills-mapper", "state.json")
+	agentDir := filepath.Join(filepath.Dir(runDir), "agent-skills")
+	if err := os.MkdirAll(agentDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	linkTarget := filepath.Join(storeDir, "rebuild")
+	if err := os.Symlink(linkTarget, filepath.Join(agentDir, "rebuild")); err != nil {
+		t.Fatal(err)
+	}
+	current, err := state.Load(statePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	current.Targets[agentDir] = state.Target{Links: map[string]string{"rebuild": linkTarget}}
+	if err := os.MkdirAll(filepath.Dir(statePath), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := current.Save(statePath); err != nil {
+		t.Fatal(err)
+	}
+
+	var out, errb bytes.Buffer
+	if code := Run([]string{"unmap", agentDir}, &out, &errb); code != exitError {
+		t.Fatalf("exit=%d, want %d", code, exitError)
+	}
+	if !strings.Contains(errb.String(), "use sm clean") {
+		t.Errorf("stderr %q lacks 'use sm clean'", errb.String())
+	}
+	if !isSymlink(t, filepath.Join(agentDir, "rebuild")) {
+		t.Error("unmap removed a sync-managed link")
+	}
+}
+
+func TestUnmapUsage(t *testing.T) {
+	mapFixture(t)
+	for _, args := range [][]string{{"unmap"}, {"unmap", "a", "b"}, {"unmap", "--bogus", "a"}} {
+		var out, errb bytes.Buffer
+		if code := Run(args, &out, &errb); code != exitUsage {
+			t.Errorf("%v: exit=%d, want %d", args, code, exitUsage)
+		}
+	}
+}
+
+func TestStatusHintsForMappedTargets(t *testing.T) {
+	_, runDir := mapFixture(t)
+	var out, errb bytes.Buffer
+	if code := Run([]string{"init"}, &out, &errb); code != 0 {
+		t.Fatalf("init exit=%d stderr=%s", code, errb.String())
+	}
+	if code := Run([]string{"map", runDir, "rebuild"}, &out, &errb); code != 0 {
+		t.Fatalf("map exit=%d stderr=%s", code, errb.String())
+	}
+	out.Reset()
+	if code := Run([]string{"status"}, &out, &errb); code != 0 {
+		t.Fatalf("status exit=%d stderr=%s", code, errb.String())
+	}
+	if !strings.Contains(out.String(), "undo with: sm unmap") {
+		t.Errorf("status %q lacks the unmap hint", out.String())
+	}
+	if err := os.RemoveAll(runDir); err != nil {
+		t.Fatal(err)
+	}
+	out.Reset()
+	if code := Run([]string{"status"}, &out, &errb); code != 0 {
+		t.Fatalf("status exit=%d stderr=%s", code, errb.String())
+	}
+	if !strings.Contains(out.String(), "folder gone; drop the record with: sm clean --orphans") {
+		t.Errorf("status %q lacks the folder-gone hint", out.String())
+	}
+}
+
+func mappedStateTargetOrEmpty(t *testing.T) (string, state.Target) {
+	t.Helper()
+	statePath := filepath.Join(os.Getenv("XDG_DATA_HOME"), "skills-mapper", "state.json")
+	current, err := state.Load(statePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for dir, target := range current.Targets {
+		if target.Mapped {
+			return dir, target
+		}
+	}
+	return "", state.Target{}
+}

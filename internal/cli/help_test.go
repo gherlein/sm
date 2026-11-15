@@ -161,6 +161,7 @@ func TestSubcommandHelpExitsZero(t *testing.T) {
 	flagsByCommand := map[string][]string{
 		"sync":   {"dry-run", "copy", "store", "agent-home", "allow-empty"},
 		"map":    {"profile", "from", "copy", "dry-run", "store"},
+		"unmap":  {},
 		"init":   {},
 		"status": {"store", "agent-home"},
 		"clean":  {"agent", "agent-home", "orphans"},
@@ -200,7 +201,7 @@ func TestInit_HelpHeaderHasNoFlagsPlaceholder(t *testing.T) {
 func TestUsageSummaryMatchesPrintedFlags(t *testing.T) {
 	top := run("-h")
 	expectCode(t, top, exitOK)
-	for _, command := range []string{"sync", "map", "init", "status", "clean", "probe"} {
+	for _, command := range []string{"sync", "map", "unmap", "init", "status", "clean", "probe"} {
 		t.Run(command, func(t *testing.T) {
 			newEnv(t)
 			r := run(command, "-h")

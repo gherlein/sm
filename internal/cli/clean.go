@@ -353,8 +353,9 @@ func sortedTargetDirs(current state.State) []string {
 
 // cleanOrphans removes the sm entries of true orphans, drops the duplicate
 // records of alias keys without touching the filesystem (the live agent's own
-// key keeps the real record), and leaves provisioned targets alone, saying
-// how to clean them. It reports whether state changed.
+// key keeps the real record), drops the records of mapped targets whose folder
+// is gone, and leaves provisioned and live mapped targets alone, saying how to
+// clean them. It reports whether state changed.
 func cleanOrphans(cfg agents.Config, current *state.State, statePath string, out io.Writer) (parts []string, changed bool, err error) {
 	unmapped, err := classifyUnmapped(cfg, *current)
 	if err != nil {
@@ -379,7 +380,15 @@ func cleanOrphans(cfg agents.Config, current *state.State, statePath string, out
 		case provisionedTarget:
 			fmt.Fprintf(out, "%s: provisioned with --agent-home; left alone (clean with: sm clean --agent-home %s)\n", target.dir, target.agentHome)
 		case mappedTarget:
-			fmt.Fprintf(out, "%s: mapped target (sm map); left alone (deleting the folder removes its links; the record stays)\n", target.dir)
+			// A mapped folder that is gone has nothing left on disk, so its
+			// record is dropped; one that exists is the caller's to unmap.
+			if mappedFolderGone(target.dir) {
+				delete(current.Targets, target.dir)
+				changed = true
+				fmt.Fprintf(out, "%s: mapped folder no longer exists; dropped its record, removed nothing\n", target.dir)
+				continue
+			}
+			fmt.Fprintf(out, "%s: mapped target (sm map); left alone (undo with: sm unmap %s)\n", target.dir, target.dir)
 		case orphanTarget:
 			// An orphan has no agent name any more; its directory names it.
 			orphan := agents.Agent{Name: target.dir, Dir: target.dir}
@@ -410,7 +419,9 @@ func cleanTarget(current *state.State, agent agents.Agent, statePath string, out
 	for name, storePath := range target.Copies {
 		remainingCopies[name] = storePath
 	}
-	current.Targets[agent.Dir] = state.Target{Links: remainingLinks, Copies: remainingCopies}
+	// Mapped is kept so a mid-run failure leaves a mapped target classified as
+	// mapped, not as an orphan, in the state it persists.
+	current.Targets[agent.Dir] = state.Target{Links: remainingLinks, Copies: remainingCopies, Mapped: target.Mapped}
 	fail := func(removedCount int, cause error) (int, error) {
 		return removedCount, persistThenFail(*current, statePath, fmt.Errorf("agent %s: %w", agent.Name, cause))
 	}

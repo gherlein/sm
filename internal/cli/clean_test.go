@@ -595,3 +595,30 @@ func TestCleanOrphansSkipsMappedTarget(t *testing.T) {
 		t.Error("mapped target record was dropped by --orphans")
 	}
 }
+
+// TestCleanOrphansDropsGoneMappedTarget proves clean --orphans drops the record
+// of a mapped target whose folder was deleted, and only that record.
+func TestCleanOrphansDropsGoneMappedTarget(t *testing.T) {
+	fixture := newSyncFixture(t, "alpha")
+	goneDir := filepath.Join(t.TempDir(), "gone-run")
+	current := loadState(t, fixture.statePath)
+	current.Targets[goneDir] = state.Target{
+		Links:  map[string]string{"alpha": filepath.Join(fixture.storeDir, "alpha")},
+		Mapped: true,
+	}
+	if err := current.Save(fixture.statePath); err != nil {
+		t.Fatal(err)
+	}
+
+	var out bytes.Buffer
+	if _, err := doClean(fixture.cfg, fixture.statePath, "", true, &out); err != nil {
+		t.Fatalf("doClean --orphans: %v", err)
+	}
+	if !strings.Contains(out.String(), goneDir+": mapped folder no longer exists; dropped its record") {
+		t.Errorf("output %q lacks the dropped-record notice", out.String())
+	}
+	after := loadState(t, fixture.statePath)
+	if _, recorded := after.Targets[goneDir]; recorded {
+		t.Error("record of a deleted mapped folder survived clean --orphans")
+	}
+}
