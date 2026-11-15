@@ -65,7 +65,14 @@ deps:
 BREW_PREFIX = $(shell command -v brew >/dev/null 2>&1 && brew --prefix)
 INSTALLDIR = $(if $(BREW_PREFIX),$(BREW_PREFIX)/bin,$(HOME)/.local/bin)
 
+# A brew-installed skills-mapper leaves sm/ms in brew's bin as symlinks into
+# its read-only Cellar; go install would follow them and fail with "permission
+# denied". Unlink the formula first (`brew link skills-mapper` restores it).
 install:
+	@if [ -n "$(BREW_PREFIX)" ] && brew list --formula skills-mapper >/dev/null 2>&1; then \
+		echo "unlinking brew's skills-mapper so the local build can replace it"; \
+		brew unlink skills-mapper; \
+	fi
 	GOBIN=$(INSTALLDIR) $(GOCMD) install $(SM_PKG) $(MS_PKG)
 	@echo "installed sm and ms to $(INSTALLDIR)"
 
