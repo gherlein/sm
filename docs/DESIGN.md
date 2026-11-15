@@ -297,11 +297,13 @@ adopted records count toward it.
 <folder> [skill ...]`. It reads no `agents.toml`.
 
 1. **Selection.** Exactly one source: `--profile NAME` reads
-   `$XDG_CONFIG_HOME/skills-mapper/profiles/NAME.toml`, `--from PATH` reads any
+   `$XDG_CONFIG_HOME/skills-mapper/profiles/NAME.toml` (`NAME` must be a plain
+   file stem: no `/` or `\`, no leading `.`), `--from PATH` reads any
    profile file, or the trailing positionals are the names. No source, or more
    than one, is a usage error (exit `2`). A profile is TOML with one key,
    `skills = ["a", "b"]`; a missing or empty list is an error (exit `1`), and
-   duplicate names collapse to their first occurrence (`internal/profile`).
+   duplicate names collapse to their first occurrence with a
+   `sm map: warning: profile lists more than once: <names>` (`internal/profile`).
 2. **Store.** The store (default or `--store`, symlink-resolved) is enumerated
    and checked not world-writable, exactly as for `sync`; enumeration warnings
    print as `sm map: warning: ...`.
@@ -942,8 +944,7 @@ These are accepted, not defended against:
   configured agent directory (the target is always the named folder), but it
   is inconsistent with the other verbs.
 - **Mapped records persist.** See [Open / future](#open--future): nothing drops
-  a mapped target's record, and the `clean --orphans` hint for one overstates
-  what deleting the folder does.
+  a mapped target's record.
 
 ## Migration from the earlier design
 
@@ -972,9 +973,7 @@ Removed packages: `config` (`skills.toml`), `cache` (clone/pull), `resolve`
 - **Unmapping.** A mapped target's record is never dropped (deleting the folder
   leaves it, and no verb removes it), so ephemeral per-run folders accumulate
   records. Candidates: an `sm unmap <folder>`, or letting `clean --orphans`
-  drop a mapped record whose folder no longer exists. The
-  `clean --orphans` hint "remove the directory to reclaim it" promises the
-  latter and is not yet true.
+  drop a mapped record whose folder no longer exists.
 
 - **Project scope** — a project-local store fanning out into a repo's per-project
   agent directories.

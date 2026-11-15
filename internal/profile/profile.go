@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 
 	"github.com/BurntSushi/toml"
 )
@@ -55,6 +56,16 @@ func DefaultDir() (string, error) {
 		base = filepath.Join(home, ".config")
 	}
 	return filepath.Join(base, "skills-mapper", "profiles"), nil
+}
+
+// ValidName reports whether name can name a profile: a plain file stem with no
+// path separator and no leading dot, so --profile can only read a file inside
+// the profiles dir. A file elsewhere is read with --from instead.
+func ValidName(name string) error {
+	if name == "" || strings.HasPrefix(name, ".") || strings.ContainsAny(name, `/\`) {
+		return fmt.Errorf("invalid profile name %q (use --from for a path)", name)
+	}
+	return nil
 }
 
 // NamePath maps a profile dir and a profile name to the profile file path.

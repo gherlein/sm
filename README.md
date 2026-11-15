@@ -260,7 +260,7 @@ the skills that left it. It needs no `agents.toml`, takes the same state lock as
 marked as mapped, so `sm status` lists it as `mapped target: <dir> (<n>
 entries)` and neither `sm clean` nor `sm clean --orphans` touches it. Flags may
 come before or after the folder; give exactly one of `--profile`, `--from` or
-trailing names. Duplicate names in a profile are collapsed.
+trailing names. Duplicate names in a profile are collapsed, with a warning.
 
 To tear a mapped folder down, delete it. Its record stays in the state file
 and `sm status` keeps listing it (see [Limitations](#limitations)); a later
@@ -497,7 +497,7 @@ Flags accept one or two dashes.
 | | `--agent-home DIR` | Re-root every agent directory from `$HOME` into `DIR`. |
 | | `--allow-empty` | Let an empty store remove everything `sm` recorded (refused by default). |
 | `sm map <folder> [skill ...]` | | Link (or copy) a named subset of the store into `folder`, taken literally, and reconcile. Name the subset with exactly one of `--profile`, `--from`, or trailing skill names. See [Map a subset into a folder](#map-a-subset-into-a-folder). |
-| | `--profile NAME` | Read the skill list from `$XDG_CONFIG_HOME/skills-mapper/profiles/NAME.toml`. |
+| | `--profile NAME` | Read the skill list from `$XDG_CONFIG_HOME/skills-mapper/profiles/NAME.toml`. `NAME` is a plain name (no `/`, no leading `.`); use `--from` for a path. |
 | | `--from PATH` | Read the skill list from the profile file at `PATH`. |
 | | `--copy` | Copy mode: real directories instead of symlinks. |
 | | `--dry-run` | Report the counts; change nothing. |
@@ -640,7 +640,7 @@ Without `--agent-home`, `status` also lists directories in the state file that
 | `orphaned target: <dir> (<n> entries)` | An agent removed from `agents.toml`. | Removes its `sm` entries (identity-checked) and forgets it. |
 | `aliased target: <dir> (same directory as agent <name>)` | Another spelling (via a symlink) of a listed agent's directory, for example after you changed how the path is written. The next `sm sync` adopts its verified records (see [If you respell an agent directory](#if-you-respell-an-agent-directory)). | Merges the records that still verify into the listed agent (`merged <n> record(s) from <old> into <dir>`) and drops the duplicate (`<old>: same directory as agent <a>; dropped its duplicate record, removed nothing`); removes nothing on disk. |
 | `provisioned target: <dir> (<n> entries; clean with: sm clean --agent-home <root>)` | A layout made with `--agent-home`, shown this way only while the layout's path still ends with a configured agent's home-relative path (for example `.claude/skills`); this works whether the agent is spelled through `$HOME` or, when `$HOME` is a symlink, through its resolved path. Once you remove the agent, or respell its directory so that no longer matches, the same directory shows as `orphaned target`. | Leaves it alone and prints `<dir>: provisioned with --agent-home; left alone (clean with: sm clean --agent-home <root>)`; run the printed command. If it shows as an orphan, `sm clean --orphans` removes its `sm` entries; to be explicit, run `sm clean --agent-home <root>` first. |
-| `mapped target: <dir> (<n> entries)` | A folder made with `sm map`. | Leaves it alone and prints `<dir>: mapped target (sm map); left alone (remove the directory to reclaim it)`. Deleting the directory removes the links but not the record (see [Limitations](#limitations)). |
+| `mapped target: <dir> (<n> entries)` | A folder made with `sm map`. | Leaves it alone and prints `<dir>: mapped target (sm map); left alone (deleting the folder removes its links; the record stays)`. Deleting the directory removes the links but not the record (see [Limitations](#limitations)). |
 | `unclassifiable target: <dir> (<reason>)` | A record whose path cannot be resolved. | Leaves it alone. |
 
 ### `sm clean`
@@ -679,7 +679,7 @@ Other `--orphans` lines, one per target it leaves or tidies:
 merged 1 record(s) from ~/.claude/skills into ~/cl2/skills
 ~/.claude/skills: same directory as agent claude-code; dropped its duplicate record, removed nothing
 ~/trial/.claude/skills: provisioned with --agent-home; left alone (clean with: sm clean --agent-home ~/trial)
-/home/you/run: mapped target (sm map); left alone (remove the directory to reclaim it)
+/home/you/run: mapped target (sm map); left alone (deleting the folder removes its links; the record stays)
 ```
 
 The agent directories themselves are left in place (empty).

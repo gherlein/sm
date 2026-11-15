@@ -379,7 +379,7 @@ func cleanOrphans(cfg agents.Config, current *state.State, statePath string, out
 		case provisionedTarget:
 			fmt.Fprintf(out, "%s: provisioned with --agent-home; left alone (clean with: sm clean --agent-home %s)\n", target.dir, target.agentHome)
 		case mappedTarget:
-			fmt.Fprintf(out, "%s: mapped target (sm map); left alone (remove the directory to reclaim it)\n", target.dir)
+			fmt.Fprintf(out, "%s: mapped target (sm map); left alone (deleting the folder removes its links; the record stays)\n", target.dir)
 		case orphanTarget:
 			// An orphan has no agent name any more; its directory names it.
 			orphan := agents.Agent{Name: target.dir, Dir: target.dir}

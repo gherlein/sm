@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 
 	"github.com/gherlein/sm/internal/agents"
 	"github.com/gherlein/sm/internal/link"
@@ -64,10 +65,13 @@ func runMap(ctx commandContext) int {
 		return exitUsage
 	}
 
-	names, err := mapNames(*profileName, *fromPath, adhoc)
+	names, duplicates, err := mapNames(*profileName, *fromPath, adhoc)
 	if err != nil {
 		fmt.Fprintf(ctx.stderr, "sm map: %v\n", err)
 		return exitError
+	}
+	if len(duplicates) > 0 {
+		fmt.Fprintf(ctx.stderr, "sm map: warning: profile lists more than once: %s\n", strings.Join(duplicates, ", "))
 	}
 
 	storeDir, err := resolveStore(*storeFlag)
@@ -182,29 +186,32 @@ func runMap(ctx commandContext) int {
 }
 
 // mapNames resolves the selection to a list of skill names from exactly one of
-// a named profile, a profile file path, or an ad-hoc command-line list.
-func mapNames(profileName, fromPath string, adhoc []string) ([]string, error) {
+// a named profile, a profile file path, or an ad-hoc command-line list. It also
+// returns the names a profile listed more than once, so the caller can warn.
+func mapNames(profileName, fromPath string, adhoc []string) (names, duplicates []string, err error) {
 	switch {
 	case profileName != "":
+		if err := profile.ValidName(profileName); err != nil {
+			return nil, nil, err
+		}
 		dir, err := profile.DefaultDir()
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		return readProfile(profile.NamePath(dir, profileName))
 	case fromPath != "":
 		return readProfile(fromPath)
 	default:
-		return adhoc, nil
+		return adhoc, nil, nil
 	}
 }
 
-func readProfile(path string) ([]string, error) {
+func readProfile(path string) (names, duplicates []string, err error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	names, _, err := profile.Parse(data)
-	return names, err
+	return profile.Parse(data)
 }
 
 // resolveStore returns the canonical store dir, honoring a --store override,

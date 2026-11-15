@@ -79,3 +79,16 @@ func TestDefaultDirHonorsXDG(t *testing.T) {
 		t.Fatalf("got %q, want %q", got, want)
 	}
 }
+
+func TestValidName(t *testing.T) {
+	for _, name := range []string{"go-dev", "a.b", "run_42"} {
+		if err := ValidName(name); err != nil {
+			t.Errorf("ValidName(%q) = %v, want nil", name, err)
+		}
+	}
+	for _, name := range []string{"", ".", "..", ".hidden", "../x", "a/b", `a\b`} {
+		if err := ValidName(name); err == nil {
+			t.Errorf("ValidName(%q) = nil, want error", name)
+		}
+	}
+}

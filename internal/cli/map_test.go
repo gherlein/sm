@@ -256,3 +256,35 @@ func TestMapCopyMode(t *testing.T) {
 		t.Errorf("copied skill missing SKILL.md: %v", err)
 	}
 }
+
+func TestMapProfileNameRejectsPath(t *testing.T) {
+	_, runDir := mapFixture(t)
+	var out, errb bytes.Buffer
+	code := Run([]string{"map", "--profile", "../escape", runDir}, &out, &errb)
+	if code != exitError {
+		t.Fatalf("exit=%d, want %d", code, exitError)
+	}
+	if !strings.Contains(errb.String(), "invalid profile name") {
+		t.Errorf("stderr %q lacks 'invalid profile name'", errb.String())
+	}
+	if _, err := os.Lstat(runDir); err == nil {
+		t.Error("a rejected profile name must place nothing")
+	}
+}
+
+func TestMapWarnsOnDuplicateNames(t *testing.T) {
+	_, runDir := mapFixture(t)
+	prof := filepath.Join(t.TempDir(), "dup.toml")
+	writeProfile(t, prof, "rebuild", "lint", "rebuild")
+
+	var out, errb bytes.Buffer
+	if code := Run([]string{"map", "--from", prof, runDir}, &out, &errb); code != 0 {
+		t.Fatalf("exit=%d stderr=%s", code, errb.String())
+	}
+	if !strings.Contains(errb.String(), "sm map: warning: profile lists more than once: rebuild") {
+		t.Errorf("stderr %q lacks the duplicate warning", errb.String())
+	}
+	if !strings.Contains(out.String(), "map: +2 -0") {
+		t.Errorf("stdout %q lacks 'map: +2 -0'", out.String())
+	}
+}
