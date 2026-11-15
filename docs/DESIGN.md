@@ -1,7 +1,8 @@
 # skills-mapper (`sm` and `ms`) — DESIGN
 
 - **Status:** implemented (v1).
-- **Date:** 2026-10-20.
+- **Date:** 2026-10-20; `sm map` added 2026-11-14 (design:
+  [`superpowers/specs/2026-11-13-sm-store-select-design.md`](superpowers/specs/2026-11-13-sm-store-select-design.md)).
 
 See [`../VISION.md`](../VISION.md) for the problem and solution,
 [`SKILLS-DIRECTORY-SPEC.md`](https://github.com/gherlein/embedded-skills-standard/blob/main/SKILLS-DIRECTORY-SPEC.md) for the
@@ -20,13 +21,20 @@ every agent until agents read the store directly.
 arrive in the store by a producer's means (a `git clone`, a `.deb`, a binary
 writing its embedded `SKILL.md`, or `ms`); `sm`'s only job is **store → agents**.
 
+`sm sync` fans the **whole** store into every configured agent. `sm map` is the
+selective counterpart: it projects a **named subset** of the store into **one
+folder the caller names** (a one-shot sub-agent's working directory, or a real
+agent directory), so a run sees only the skills it needs. Both read the same
+store and share the same placement, state and reconcile machinery.
+
 `ms` is the companion binary for the opposite direction: a one-off ingest of the
 skills an agent already has into the store (see [`ms`](#ms--ingest-into-the-store)).
 
 ## Scope (v1)
 
-- **Global only.** One store at `$XDG_DATA_HOME/skills/`, fanned out into each
-  agent's user-global skills directory.
+- **Global store.** One store at `$XDG_DATA_HOME/skills/`, fanned out by `sync`
+  into each agent's user-global skills directory, and projected by `map` into
+  any folder the caller names.
 - **Linux and macOS.** Linux is tested; macOS builds but is untested. Symlink
   fan-out by default, with a **`--copy` mode** that materializes real
   directories for sandbox and container homes a symlink cannot reach into.
@@ -147,6 +155,7 @@ never gates sync.
 | Command | Flags | Does |
 | --- | --- | --- |
 | `sm sync` | `--dry-run`, `--copy`, `--store DIR`, `--agent-home DIR`, `--allow-empty` | Enumerate the store, adopt alias records, link (or copy) into each enabled agent, reconcile. The everyday verb. |
+| `sm map <folder> [skill ...]` | `--profile NAME`, `--from PATH`, `--copy`, `--dry-run`, `--store DIR` | Select a named subset of the store and link (or copy) it into one literal folder, reconciled; mark the folder as mapped in state. |
 | `sm status` | `--store DIR`, `--agent-home DIR` | Read-only report: store skill count and warnings; per agent `owned`, `missing`, `unmanaged`, `dangling`; without `--agent-home`, the unmapped state targets. |
 | `sm clean` | `--agent NAME`, `--agent-home DIR`, `--orphans` | Remove the entries `sm` recorded and can still identify, for every agent, one agent, a re-rooted layout, or only the unmapped targets. |
 | `sm probe` | `--yes`, `--dry-run` | Detect installed agents and offer to add each unlisted one to `agents.toml`. |
@@ -163,7 +172,11 @@ CLI conventions:
   `status`, `clean`, `probe` and `init` take no positional arguments
   (`sm <cmd>: unexpected argument "<x>"`), because flag parsing stops at the
   first positional and `sm clean a` or `sm sync now --dry-run` would otherwise
-  silently ignore the rest. `ms` refuses an empty source or destination
+  silently ignore the rest. `sm map` is the one verb with positionals; it
+  parses them itself, re-parsing flags after each positional, so a flag after
+  the folder (`sm map ./run x --dry-run`) is still honored. `sm map` does not
+  yet apply the empty-value check (see
+  [Residual risks and known limitations](#residual-risks-and-known-limitations)). `ms` refuses an empty source or destination
   (`ms: source must not be empty`).
 - `sm -h`, `sm --help`, `sm help` and `sm <command> -h` print usage to stdout
   and exit `0`; `sm` with no arguments prints usage to stderr and exits `2`.
@@ -278,6 +291,43 @@ old key replaces it); a record whose entry no longer verifies stays under the ol
 key left empty is dropped. Adoption runs before the empty-store guard, so
 adopted records count toward it.
 
+### `sm map`
+
+`sm map [--profile NAME | --from PATH] [--copy] [--dry-run] [--store DIR]
+<folder> [skill ...]`. It reads no `agents.toml`.
+
+1. **Selection.** Exactly one source: `--profile NAME` reads
+   `$XDG_CONFIG_HOME/skills-mapper/profiles/NAME.toml`, `--from PATH` reads any
+   profile file, or the trailing positionals are the names. No source, or more
+   than one, is a usage error (exit `2`). A profile is TOML with one key,
+   `skills = ["a", "b"]`; a missing or empty list is an error (exit `1`), and
+   duplicate names collapse to their first occurrence (`internal/profile`).
+2. **Store.** The store (default or `--store`, symlink-resolved) is enumerated
+   and checked not world-writable, exactly as for `sync`; enumeration warnings
+   print as `sm map: warning: ...`.
+3. **Resolve.** Store names are unique, so each name is present once,
+   non-conforming, or absent (`internal/mapsel`). Any absent or non-conforming
+   name fails the whole run before anything is placed:
+   `sm map: unknown skills: <names>; unusable skills: <names>` (sorted).
+4. **Target.** The folder is taken **literally** — nothing such as
+   `.agents/skills` is appended — made absolute and symlink-resolved, and used
+   as the state key. It is created on first placement.
+5. **Place and reconcile.** A synthetic agent whose name and directory are the
+   resolved folder goes through the same `applyLinkTarget` / `applyCopyTarget`
+   path as `sync`, under the same state lock (skipped in a dry run), with the
+   same ownership checks and identity-based reconcile: re-mapping with a
+   smaller selection removes only entries `sm` made; hand-placed entries are
+   reported as unmanaged and left alone.
+6. **Mark.** The state target gets `"mapped": true` before placement, so
+   `status` and `clean --orphans` classify it as a `mapped target` rather than
+   an orphan.
+
+The summary is `map: +N -M` (link mode) or `map: +N ~F -M` (copy mode).
+
+`map` and `sync` reconcile toward different sets, so a folder that is both
+mapped and listed in `agents.toml` is pulled back and forth by each run; map
+into folders `sync` does not manage.
+
 ### `sm status`
 
 Never changes anything and takes no lock. Columns per agent:
@@ -298,6 +348,7 @@ is skipped under `--agent-home`):
 | `orphaned target: <dir> (<n> entries)` | Not related to any configured agent: an agent removed from `agents.toml`. |
 | `aliased target: <dir> (same directory as agent <name>)` | Resolves to the real directory of a configured agent: an older spelling. |
 | `provisioned target: <dir> (<n> entries; clean with: sm clean --agent-home <root>)` | Ends with a configured agent's home-relative path (longest match wins): a `--agent-home` layout. |
+| `mapped target: <dir> (<n> entries)` | Marked `mapped` in state: a folder `sm map` placed into. Checked before the orphan case. |
 | `unclassifiable target: <dir> (<reason>)` | The key cannot be resolved (for example a symlink loop or an unreadable parent). |
 
 Classification uses the agents configured now: a `--agent-home` layout of an
@@ -333,7 +384,10 @@ place.
   (`<old>: same directory as agent <a>; dropped its duplicate record, removed
   nothing`), removing nothing on disk; **provisioned** targets are reported
   (`<dir>: provisioned with --agent-home; left alone (clean with: sm clean
-  --agent-home <root>)`) and left alone, and so are **unclassifiable** ones. With nothing to do it prints
+  --agent-home <root>)`) and left alone; **mapped** targets are reported
+  (`<dir>: mapped target (sm map); left alone (remove the directory to reclaim
+  it)`) and left alone, and so are **unclassifiable** ones. A plain `clean`
+  walks only configured agents, so it never touches a mapped folder either. With nothing to do it prints
   `clean: no orphaned targets`. `--orphans` cannot be combined with `--agent`
   or `--agent-home` (usage error, exit `2`).
 
@@ -526,6 +580,10 @@ One central file at `$XDG_DATA_HOME/skills-mapper/state.json` (default
     "/home/u/.claude/skills": {
       "links": { "emoji": "/home/u/.local/share/skills/emoji" },
       "copies": { "pdf-tools": "/home/u/.local/share/skills/pdf-tools" }
+    },
+    "/home/u/work/run-42": {
+      "links": { "rebuild": "/home/u/.local/share/skills/rebuild" },
+      "mapped": true
     }
   },
   "updated_at": "2026-10-20T17:27:27Z"
@@ -536,6 +594,10 @@ One central file at `$XDG_DATA_HOME/skills-mapper/state.json` (default
   not resolved); under `--agent-home` the home is symlink-resolved first.
   `links` and `copies` map a skill name to the store path recorded when the
   entry was made; `copies` is omitted when empty.
+- **`mapped`** (omitted unless true) marks a target `sm map` created. It only
+  changes classification (`status`, `clean --orphans`); placement and
+  reconcile treat the target like any other. Nothing clears it: deleting the
+  folder leaves the record, which `status` keeps listing.
 - **Version.** `version` must be `1`. Any other value, a missing version, or a
   `null` document is refused (`unsupported state version ...; refusing to use or
   overwrite it`), as are relative keys, keys that are not clean paths
@@ -550,10 +612,10 @@ One central file at `$XDG_DATA_HOME/skills-mapper/state.json` (default
   The state file is written `0600` via a temp file and rename, so a crash never
   leaves a truncated file; there is no `fsync` before the rename, so a power
   loss can still lose the latest save.
-- **Lock.** `sync` (not in dry run), `clean` and `ms` (not in dry run) take an
+- **Lock.** `sync` (not in dry run), `map` (not in dry run), `clean` and `ms` (not in dry run) take an
   exclusive, non-blocking `flock` on `state.json.lock` (`0600`, opened with
   `O_NOFOLLOW`) for the whole load-modify-save (for `ms`, the whole write), so
-  the three never overlap. The lock is labelled with the tools that take it; a
+  they never overlap. The lock is labelled with the tools that take it; a
   second run fails at once: `another sm or ms process is running (lock <path>)`.
   `ms` additionally takes the ingest ledger lock, always after the state lock
   (`sm` never takes the ledger lock, so there is no deadlock); a concurrent
@@ -599,7 +661,9 @@ it is restored.
 ```
 cmd/sm/                 sm entrypoint
 cmd/ms/                 ms entrypoint
-internal/cli/           sm commands: sync, status, clean, probe, init; flag overrides, alias adoption, orphan classification
+internal/cli/           sm commands: sync, map, status, clean, probe, init; flag overrides, alias adoption, orphan classification
+internal/profile/       sm map profiles: TOML skill-list parsing (dedupe), profiles dir and name -> path
+internal/mapsel/        sm map selection: resolve names against a store listing, failing on unknown or unusable
 internal/agents/        built-in registry; agents.toml load, strict validation, expansion, starter file
 internal/store/         enumerate the store: skills, warnings, unusable entries (reads the filesystem directly)
 internal/skillmeta/     SKILL.md frontmatter reading and the skill name pattern (shared by sm and ms)
@@ -738,7 +802,9 @@ only `~`; a `$VAR` stays literal.
 | `ms`: `SKILL.md` is a symlink leaving the skill, or cannot be resolved inside it | Skip with a warning, count as skipped (dry run too); exit `0`. |
 | Invalid `agents.toml` (unknown key, unset/empty variable, relative path, home or ancestor, overlap with store) | Fail loud; change nothing; exit `1`. |
 | State file of another version, without `targets`, with an unclean key, or malformed | Refuse to use or overwrite it; exit `1`. |
-| Another `sm sync`/`clean`/`ms` running | `another sm or ms process is running (lock <path>)` for the state lock; `another ms process is running (lock <path>)` for the ledger lock; exit `1`. |
+| `sm map` names a skill absent from, or non-conforming in, the store | `sm map: unknown skills: ...; unusable skills: ...`; place nothing; exit `1`. |
+| `sm map` with no folder, no selection, or more than one selection source | Print `sm map` usage to stderr; exit `2`. |
+| Another `sm sync`/`map`/`clean`/`ms` running | `another sm or ms process is running (lock <path>)` for the state lock; `another ms process is running (lock <path>)` for the ledger lock; exit `1`. |
 | Old version of a refreshed copy cannot be deleted | Warn `previous version kept at <path>; remove it manually`; continue. |
 | Failure part way through an agent | Save the progress made so far, report the error, exit `1`; re-running `sm sync` completes the job. |
 | Process killed between a filesystem change and the state save | The new entry is unrecorded and later reported as unmanaged (left alone); a killed copy leaves a `.sm-stage-*` that the next copy-mode sync sweeps, except in the narrow window after the sentinel is removed and before the rename. |
@@ -766,10 +832,14 @@ All tests use the standard `testing` package and run only through the Makefile
   `--follow-symlinks` ingest-once and ancestor links), writing (`--force` swap, symlinked destination
   entries, overlap in both directions), the ledger (append, corrupt ledger,
   lock), and the command line (`--`, `-h`, literal `$VAR`).
-- **Integration, hermetic:** `sync`, `status`, `clean` and `probe` driven end
-  to end over temp `HOME` / XDG trees, covering alias adoption, orphan
-  classification, `clean --orphans`, the empty-store guard and mixed-mode
-  directories.
+- **Integration, hermetic:** `sync`, `map`, `status`, `clean` and `probe`
+  driven end to end over temp `HOME` / XDG trees, covering alias adoption,
+  orphan classification, `clean --orphans` (including that it leaves mapped
+  targets), the empty-store guard and mixed-mode directories. `map` is covered
+  for each selection source, flag-after-folder parsing, fail-closed on unknown
+  and unusable names, shrinking reconcile, unmanaged protection, the literal
+  target, the `mapped` marker, and copy mode (`internal/cli/map_test.go`);
+  `internal/profile` and `internal/mapsel` have unit tests.
 - **Black-box regression suite:** `internal/cli/regress_test.go` and
   `internal/mscli/regress_test.go` drive only `cli.Run` / `mscli.Run` and
   assert observable filesystem state, exit codes and messages for every
@@ -866,6 +936,14 @@ These are accepted, not defended against:
 - **Platform.** Linux and macOS only; Windows is untested (symlink mode needs
   privileges; the ownership check, lock and state-directory tightening are
   no-ops there). User-global scope only.
+- **`sm map` flag values.** `map` parses its own positionals and does not run
+  the shared empty-value check: `--store ""` falls back to the default store
+  and `--profile ""` / `--from ""` count as not given. It cannot widen into a
+  configured agent directory (the target is always the named folder), but it
+  is inconsistent with the other verbs.
+- **Mapped records persist.** See [Open / future](#open--future): nothing drops
+  a mapped target's record, and the `clean --orphans` hint for one overstates
+  what deleting the folder does.
 
 ## Migration from the earlier design
 
@@ -890,6 +968,13 @@ Removed packages: `config` (`skills.toml`), `cache` (clone/pull), `resolve`
 - The `add`, `remove`, `update`, and `link` commands as source-manifest verbs.
 
 ## Open / future
+
+- **Unmapping.** A mapped target's record is never dropped (deleting the folder
+  leaves it, and no verb removes it), so ephemeral per-run folders accumulate
+  records. Candidates: an `sm unmap <folder>`, or letting `clean --orphans`
+  drop a mapped record whose folder no longer exists. The
+  `clean --orphans` hint "remove the directory to reclaim it" promises the
+  latter and is not yet true.
 
 - **Project scope** — a project-local store fanning out into a repo's per-project
   agent directories.

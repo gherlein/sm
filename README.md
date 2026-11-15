@@ -69,6 +69,7 @@ specifications are proposals (drafts), not adopted standards.
 - [Why this exists, and what we propose](#why-this-exists-and-what-we-propose)
 - [Quick start](#quick-start)
 - [Day to day](#day-to-day)
+- [Map a subset into a folder](#map-a-subset-into-a-folder)
 - [Concepts](#concepts)
 - [Getting skills into the store](#getting-skills-into-the-store)
 - [Configuring agents](#configuring-agents)
@@ -193,6 +194,7 @@ is safe to run any time (use `sm sync --dry-run` to preview).
 | Stop using an agent | Remove its line from `agents.toml`, then `sm clean --orphans` to remove the links `sm` left there. |
 | Check that all is well | `sm status`: every agent should show `missing=0 unmanaged=0 dangling=0`. Warnings about store entries are printed after the `store:` line. |
 | Adopt skills an agent made itself | `ms <agent skills folder>`, then `sm sync` (see [Getting skills into the store](#getting-skills-into-the-store)). |
+| Give a one-shot run only some skills | `sm map --profile <name> <folder>` — symlink just the named skills from the store into that folder (see [Map a subset into a folder](#map-a-subset-into-a-folder)). |
 | Undo everything | `sm clean`, then see [Uninstall](#uninstall). |
 
 When something looks off, start with `sm status`, then
@@ -226,6 +228,43 @@ the plugin, once as a personal skill). Ingest the whole tree only when you want
 plugin skills in your other agents, and review them first: `ms` prints a
 `note:` line whenever it wrote plugin skills (see
 [Safety and trust model](#safety-and-trust-model)).
+
+## Map a subset into a folder
+
+`sm sync` fans the whole store into every enabled agent. `sm map` does the
+opposite: it projects a hand-picked **subset** of the store into **one folder
+you name** — a one-shot sub-agent's working directory, or a real agent dir —
+so that run sees only the skills it needs.
+
+```sh
+sm map --profile go-dev ./run            # named profile ~/.config/skills-mapper/profiles/go-dev.toml
+sm map --from ./run-skills.toml ./run     # any profile file by path
+sm map ./run rebuild lint                 # an ad-hoc list of skill names
+sm map --from ./run-skills.toml ./run --dry-run   # preview "map: +N -M"
+sm map --copy ./sandbox rebuild           # real copies, for a home a symlink can't reach
+```
+
+A profile is a hand-edited TOML list of clean skill names:
+
+```toml
+skills = ["rebuild", "lint"]
+```
+
+The target folder is taken **literally** — `sm map ./run rebuild` writes
+`./run/rebuild`, so pass `./run/.agents/skills` when that is what you want. An
+unknown or non-conforming skill name fails the whole run and places nothing.
+`sm map` reconciles like `sm sync` (only links it made are ever removed, never
+a hand-placed file): re-mapping the same folder with a smaller profile removes
+the skills that left it. It needs no `agents.toml`, takes the same state lock as
+`sync` and `clean` (not in a dry run), and records the folder in the state file
+marked as mapped, so `sm status` lists it as `mapped target: <dir> (<n>
+entries)` and neither `sm clean` nor `sm clean --orphans` touches it. Flags may
+come before or after the folder; give exactly one of `--profile`, `--from` or
+trailing names. Duplicate names in a profile are collapsed.
+
+To tear a mapped folder down, delete it. Its record stays in the state file
+and `sm status` keeps listing it (see [Limitations](#limitations)); a later
+`sm map` into the same path picks the record up again.
 
 ## Concepts
 
@@ -457,6 +496,12 @@ Flags accept one or two dashes.
 | | `--store DIR` | Use `DIR` as the store. See [Advanced](#advanced---store---agent-home---copy). |
 | | `--agent-home DIR` | Re-root every agent directory from `$HOME` into `DIR`. |
 | | `--allow-empty` | Let an empty store remove everything `sm` recorded (refused by default). |
+| `sm map <folder> [skill ...]` | | Link (or copy) a named subset of the store into `folder`, taken literally, and reconcile. Name the subset with exactly one of `--profile`, `--from`, or trailing skill names. See [Map a subset into a folder](#map-a-subset-into-a-folder). |
+| | `--profile NAME` | Read the skill list from `$XDG_CONFIG_HOME/skills-mapper/profiles/NAME.toml`. |
+| | `--from PATH` | Read the skill list from the profile file at `PATH`. |
+| | `--copy` | Copy mode: real directories instead of symlinks. |
+| | `--dry-run` | Report the counts; change nothing. |
+| | `--store DIR` | Use `DIR` as the store. |
 | `sm status` | | Read-only report per agent. Never changes anything. |
 | | `--store DIR`, `--agent-home DIR` | As for `sync`, to inspect that layout. |
 | `sm clean` | | Remove every link and copy `sm` recorded, for every agent. |
@@ -494,7 +539,11 @@ widens what a command touches:
   empty`. An empty `ms` source or destination is refused the same way.
 - `sync`, `status`, `clean`, `probe` and `init` take no positional arguments;
   `sm clean a` and `sm sync now --dry-run` fail with `sm clean: unexpected
-  argument "a"` instead of cleaning everything or syncing for real.
+  argument "a"` instead of cleaning everything or syncing for real. `sm map` is
+  the one verb that takes positionals (the folder, then any skill names), and
+  it honors its flags in any position, so `sm map ./run rebuild --dry-run`
+  stays a dry run. Giving it no folder, no selection, or more than one kind of
+  selection is a usage error (exit `2`).
 
 The summary lines in `sm -h` and `ms -h` are short: `sm -h` says `sync` will
 "link every store skill into each agent directory" and `status` reports
@@ -591,6 +640,7 @@ Without `--agent-home`, `status` also lists directories in the state file that
 | `orphaned target: <dir> (<n> entries)` | An agent removed from `agents.toml`. | Removes its `sm` entries (identity-checked) and forgets it. |
 | `aliased target: <dir> (same directory as agent <name>)` | Another spelling (via a symlink) of a listed agent's directory, for example after you changed how the path is written. The next `sm sync` adopts its verified records (see [If you respell an agent directory](#if-you-respell-an-agent-directory)). | Merges the records that still verify into the listed agent (`merged <n> record(s) from <old> into <dir>`) and drops the duplicate (`<old>: same directory as agent <a>; dropped its duplicate record, removed nothing`); removes nothing on disk. |
 | `provisioned target: <dir> (<n> entries; clean with: sm clean --agent-home <root>)` | A layout made with `--agent-home`, shown this way only while the layout's path still ends with a configured agent's home-relative path (for example `.claude/skills`); this works whether the agent is spelled through `$HOME` or, when `$HOME` is a symlink, through its resolved path. Once you remove the agent, or respell its directory so that no longer matches, the same directory shows as `orphaned target`. | Leaves it alone and prints `<dir>: provisioned with --agent-home; left alone (clean with: sm clean --agent-home <root>)`; run the printed command. If it shows as an orphan, `sm clean --orphans` removes its `sm` entries; to be explicit, run `sm clean --agent-home <root>` first. |
+| `mapped target: <dir> (<n> entries)` | A folder made with `sm map`. | Leaves it alone and prints `<dir>: mapped target (sm map); left alone (remove the directory to reclaim it)`. Deleting the directory removes the links but not the record (see [Limitations](#limitations)). |
 | `unclassifiable target: <dir> (<reason>)` | A record whose path cannot be resolved. | Leaves it alone. |
 
 ### `sm clean`
@@ -629,6 +679,7 @@ Other `--orphans` lines, one per target it leaves or tidies:
 merged 1 record(s) from ~/.claude/skills into ~/cl2/skills
 ~/.claude/skills: same directory as agent claude-code; dropped its duplicate record, removed nothing
 ~/trial/.claude/skills: provisioned with --agent-home; left alone (clean with: sm clean --agent-home ~/trial)
+/home/you/run: mapped target (sm map); left alone (remove the directory to reclaim it)
 ```
 
 The agent directories themselves are left in place (empty).
@@ -807,7 +858,7 @@ follows a symlinked entry into what it points at.
   devices are never copied.
 - Overlaps are refused: an agent directory overlapping the store, an `ms`
   destination overlapping its source, and a skill overlapping its destination.
-- One run at a time: `sm sync`, `sm clean` and `ms` all take the state lock
+- One run at a time: `sm sync`, `sm map`, `sm clean` and `ms` all take the state lock
   (`state.json.lock`), and `ms` also takes its own ledger lock
   (`ingest-log.json.lock`), always in that order. A second concurrent run fails
   at once: `another sm or ms process is running (lock <path>)` for the state
@@ -911,6 +962,17 @@ store is what the agent gets.
   detected swap names whatever is at that path now; inspect it before deleting.
 - `sm` does not authenticate the store, and a few residual races remain; see
   [Safety and trust model](#safety-and-trust-model).
+- A mapped folder's record outlives the folder. There is no unmap command, and
+  neither `sm clean` nor `sm clean --orphans` drops a `mapped target`, so a
+  deleted map folder keeps appearing in `sm status` (with its old entry count)
+  until the state file is removed. Sub-agent runs that map into a fresh
+  temporary folder each time accumulate one record per run.
+- `sm map` does not yet refuse an empty flag value the way the other verbs do:
+  `--store ""` falls back to the default store and `--profile ""` counts as not
+  given.
+- Mapping into a directory that `agents.toml` also lists makes `sm sync` and
+  `sm map` reconcile the same folder toward different sets: each run undoes the
+  other's selection. Map into folders `sm sync` does not manage.
 
 ## Troubleshooting
 
@@ -1033,8 +1095,9 @@ whatever is left under the old spelling.
 
 ```sh
 # 1. Remove every link and copy sm made. Do this before deleting the state file.
-sm status                          # note any "provisioned target" lines
+sm status                          # note any "provisioned target" and "mapped target" lines
 sm clean --agent-home <root>       # once per provisioned target, if any
+rm -r <dir>                        # once per mapped target you no longer want (sm clean leaves them)
 sm clean
 
 # 2. Optionally give agents real directories again, from your backup or the store:
@@ -1062,8 +1125,9 @@ requires.
 | --- | --- |
 | `$XDG_DATA_HOME/skills/` | The store. |
 | `$XDG_CONFIG_HOME/skills-mapper/agents.toml` | Agents to mirror into. |
+| `$XDG_CONFIG_HOME/skills-mapper/profiles/<name>.toml` | `sm map --profile <name>` skill lists (`skills = [...]`). Hand-written; `sm` never creates them. |
 | `$XDG_DATA_HOME/skills-mapper/state.json` | `sm`'s record of the links and copies it owns (`0600`). |
-| `$XDG_DATA_HOME/skills-mapper/state.json.lock` | Lock taken by `sm sync`, `sm clean` and `ms` (a real run), so they never overlap. |
+| `$XDG_DATA_HOME/skills-mapper/state.json.lock` | Lock taken by `sm sync`, `sm map`, `sm clean` and `ms` (a real run), so they never overlap. |
 | `$XDG_DATA_HOME/skills-mapper/ingest-log.json` | `ms` ingest ledger (`0600`). |
 | `$XDG_DATA_HOME/skills-mapper/ingest-log.json.lock` | Lock taken by `ms` after the state lock; `sm` never takes it. |
 | `<agent dir>/<name>/.sm-copy` | Copy-mode provenance marker. |

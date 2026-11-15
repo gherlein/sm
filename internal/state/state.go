@@ -50,6 +50,11 @@ const StateLockHolder = "sm or ms"
 type Target struct {
 	Links  map[string]string `json:"links"`
 	Copies map[string]string `json:"copies,omitempty"`
+	// Mapped marks a target that `sm map` created (a profile subset projected
+	// into a caller-named folder, never a configured agent). It is omitempty so
+	// state written by sync/copy-only setups stays byte-identical, and it is
+	// what exempts a map target from clean --orphans.
+	Mapped bool `json:"mapped,omitempty"`
 }
 
 // State is the central record, keyed by absolute agent directory.
