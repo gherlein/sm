@@ -22,6 +22,7 @@ flowchart LR
     store -- "sm sync" --> claude["~/.claude/skills"]
     store -- "sm sync" --> copilot["~/.copilot/skills"]
     store -- "sm sync" --> others["pi, oh-my-pi, hax, kit, ..."]
+    store -- "sm map (a chosen subset)" --> run["a sub-agent's run folder"]
 ```
 
 The normal direction of work is: edit skills **in the store**, then `sm sync`.
@@ -57,8 +58,8 @@ unsupported). Build with `make build` (produces `./bin/sm` and `./bin/ms`);
 | --- | --- | --- |
 | `sm sync` | Link (or copy) every store skill into each agent dir; reconcile removals | `--dry-run`, `--copy`, `--store DIR`, `--agent-home DIR`, `--allow-empty` |
 | `sm map <folder> [skill…]` | Link (or copy) a **profile subset** of the store into one named folder; reconcile | `--profile NAME`, `--from PATH`, `--copy`, `--dry-run`, `--store DIR` |
-| `sm init` | Write a starter `agents.toml` (every known agent commented out). Refuses to overwrite | (none) |
 | `sm unmap <folder>` | Remove what `sm map` placed in a folder (identity-checked) and forget it; folder stays | (none) |
+| `sm init` | Write a starter `agents.toml` (every known agent commented out). Refuses to overwrite | (none) |
 | `sm status` | Read-only report per agent: `owned/missing/unmanaged/dangling` | `--store DIR`, `--agent-home DIR` |
 | `sm clean` | Remove every `sm`-created link/copy (identity-checked) | `--agent NAME`, `--agent-home DIR`, `--orphans` |
 | `sm probe` | Detect installed agents, append confirmed ones to `agents.toml` | `--yes`, `--dry-run` |
@@ -75,18 +76,29 @@ later flags.
 
 `sm map` projects a hand-picked subset of the store into one folder you name —
 a one-shot sub-agent dir or a real agent dir. Name the subset exactly one of
-three ways: `--profile NAME` (a file at
-`~/.config/skills-mapper/profiles/NAME.toml`), `--from PATH` (any profile file),
-or trailing skill names. A profile is a TOML list, `skills = ["rebuild", "lint"]`
-(clean store names). The folder is literal (no `.agents/skills` is appended); an
-unknown or non-conforming name fails the run and places nothing. Re-mapping the
-same folder with a smaller profile removes what left it. `sm map` needs no
-`agents.toml`; `sm status` lists the folder as `mapped target`, and neither
-`sm clean` nor `sm clean --orphans` touches its links. Undo it with
-`sm unmap <folder>`, which removes only what `sm map` placed and forgets the
-folder (it refuses folders `sm sync` manages). If the folder was deleted by
-hand instead, `sm clean --orphans` drops its leftover record. Do not map into a folder `agents.toml` also lists: `sync` and
-`map` would each undo the other's selection.
+three ways:
+
+- `--profile NAME`: the file `~/.config/skills-mapper/profiles/NAME.toml`.
+  `NAME` is a plain name (no `/` or `\`, no leading `.`).
+- `--from PATH`: any profile file.
+- trailing skill names: `sm map ./run lint go-test`.
+
+A profile is a TOML list of store names, `skills = ["rebuild", "lint"]`; a name
+listed twice is used once, with a warning. The folder is literal (no
+`.agents/skills` is appended). An unknown or non-conforming name fails the run
+and places nothing. Re-mapping the same folder with a smaller profile removes
+what left it. `sm map` needs no `agents.toml`. `sm status` lists the folder as
+`mapped target`, and neither `sm clean` nor `sm clean --orphans` touches its
+links.
+
+`sm unmap <folder>` undoes a map: it removes only the entries `sm map` placed
+(files you added stay), forgets the folder, and leaves the folder itself in
+place. It refuses any folder not made by `sm map`, so it cannot strip an agent
+dir that `sm sync` manages. If a mapped folder was deleted by hand instead,
+`sm clean --orphans` drops its leftover record.
+
+Do not map into a folder `agents.toml` also lists: `sync` and `map` would each
+undo the other's selection.
 
 Exit codes: `0` ok, `1` error, `2` usage error, `3` `install-skill` refused
 (target exists and differs; use `--force`).
@@ -182,6 +194,31 @@ Keep the backup *outside* `~/.claude` so a later `ms ~/.claude` does not re-inge
 | Undo a mapped folder | `sm unmap <folder>` |
 | Undo everything | `sm clean`, plus `sm unmap <folder>` for each `mapped target` in `sm status`. |
 
+**Write a new skill and share it with every agent:**
+
+```sh
+mkdir -p ~/.local/share/skills/commit-msg
+$EDITOR ~/.local/share/skills/commit-msg/SKILL.md   # frontmatter name: commit-msg
+sm sync                                             # sync: claude-code +1 -0   copilot +1 -0
+```
+
+**Give a sub-agent only the skills it needs**, then clean up after the run:
+
+```sh
+echo 'skills = ["go-test", "lint"]' > ~/.config/skills-mapper/profiles/go-review.toml
+sm map --profile go-review ~/runs/review-42   # map: +2 -0
+# ... run the sub-agent with ~/runs/review-42 as its skills folder ...
+sm unmap ~/runs/review-42                     # unmap: -2
+```
+
+**Provision a container home with real copies** (symlinks into your home would
+not resolve inside the container):
+
+```sh
+sm sync --agent-home ~/containers/worker --copy   # -> ~/containers/worker/.claude/skills/<name>/
+sm clean --agent-home ~/containers/worker         # remove them again
+```
+
 > `ms ~/.claude/skills` takes only personal skills. `ms ~/.claude` walks the
 > whole tree **including `~/.claude/plugins`**, pulling in plugin skills (which
 > Claude Code then sees twice). `ms` prints a `note:` line when it wrote plugin
@@ -246,7 +283,7 @@ state targets (directories in state that no configured agent maps).
 
 ## Advanced flags
 
-- `--store DIR` (`sync`, `status`): use a different store than the default.
+- `--store DIR` (`sync`, `status`, `map`): use a different store than the default.
 - `--agent-home DIR` (`sync`, `status`, `clean`): re-root every agent dir from
   `$HOME` into `DIR` (e.g. `~/.claude/skills` → `DIR/.claude/skills`). Used to
   provision a skills layout for another process launched with `DIR` as its
@@ -291,7 +328,7 @@ state targets (directories in state that no configured agent maps).
 | `<dir>/.sm-stage-*`, `<dir>/.sm-old-*` | Temp staging/set-aside during copy/replace |
 
 The `skills-mapper` data dir is created `0700`; `sm sync`/`sm clean` tighten an
-existing one you own to `0700`.
+existing one you own to `0700`, and so do `sm map` and `sm unmap`.
 
 ## Troubleshooting
 
@@ -306,6 +343,7 @@ existing one you own to `0700`.
 | `install-skill` exits `3` | A different `using-skills-mapper` already in the store; re-run with `--force` to replace it. |
 | `sm map: unknown skills: <names>` / `unusable skills: <names>` | A profile name is not in the store, or is there but non-conforming. Nothing was placed; fix the name or the store entry. |
 | `mapped target: <dir> (folder gone; ...)` | The map folder was deleted by hand; its record remains. Run `sm clean --orphans` to drop it. |
+| `sm map: invalid profile name "<x>"` | `--profile` takes a plain name; pass a path with `--from` instead. |
 | `sm unmap: <dir> is not a mapped target` | The folder was not made by `sm map` (or was already unmapped). For a `sync` agent dir use `sm clean`. |
 | Something looks off | Start with `sm status`, then `sm sync --dry-run`. |
 

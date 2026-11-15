@@ -23,6 +23,7 @@ flowchart LR
     store -- "sm sync" --> claude["~/.claude/skills/&lt;name&gt;"]
     store -- "sm sync" --> copilot["~/.copilot/skills/&lt;name&gt;"]
     store -- "sm sync" --> others["pi, oh-my-pi, hax, kit,<br/>or any custom agent"]
+    store -- "sm map (a chosen subset)" --> run["a sub-agent's run folder"]
 ```
 
 Background: [`VISION.md`](VISION.md) (why), [`docs/DESIGN.md`](docs/DESIGN.md)
@@ -69,6 +70,7 @@ specifications are proposals (drafts), not adopted standards.
 - [Why this exists, and what we propose](#why-this-exists-and-what-we-propose)
 - [Quick start](#quick-start)
 - [Day to day](#day-to-day)
+- [Examples](#examples)
 - [Map a subset into a folder](#map-a-subset-into-a-folder)
 - [Concepts](#concepts)
 - [Getting skills into the store](#getting-skills-into-the-store)
@@ -229,6 +231,116 @@ the plugin, once as a personal skill). Ingest the whole tree only when you want
 plugin skills in your other agents, and review them first: `ms` prints a
 `note:` line whenever it wrote plugin skills (see
 [Safety and trust model](#safety-and-trust-model)).
+
+## Examples
+
+Each example starts from the setup in [Quick start](#quick-start), with
+Claude Code and Copilot in `agents.toml`. Paths are shortened to `~`.
+
+### Write a skill once, use it in every agent
+
+Create the skill in the store. The directory name must match `name` in the
+frontmatter.
+
+```sh
+mkdir -p ~/.local/share/skills/commit-msg
+cat > ~/.local/share/skills/commit-msg/SKILL.md <<'EOF'
+---
+name: commit-msg
+description: Write a conventional commit message for the staged changes.
+---
+Read `git diff --staged` and write a one-line conventional commit subject...
+EOF
+```
+
+```
+$ sm sync
+sync: claude-code +1 -0   copilot +1 -0
+$ sm status
+store: 1 skills (~/.local/share/skills)
+claude-code    owned=1 missing=0 unmanaged=0 dangling=0  ~/.claude/skills
+copilot        owned=1 missing=0 unmanaged=0 dangling=0  ~/.copilot/skills
+```
+
+Both agents now see `commit-msg`. Later edits to `SKILL.md` show up in both
+right away, because each agent's entry is a symlink to the one copy in the
+store.
+
+### Add skills someone else published
+
+A skill published as its own repository clones straight into the store, one
+directory per skill:
+
+```
+$ git clone https://github.com/<someone>/go-test ~/.local/share/skills/go-test
+$ git clone https://github.com/<someone>/lint    ~/.local/share/skills/lint
+$ sm sync
+sync: claude-code +2 -0   copilot +2 -0
+```
+
+Read a skill before you add it: an agent follows its instructions with the
+agent's own permissions (see [Safety and trust model](#safety-and-trust-model)).
+
+### Give a sub-agent only the skills it needs
+
+Write a profile once:
+
+```sh
+mkdir -p ~/.config/skills-mapper/profiles
+echo 'skills = ["go-test", "lint"]' > ~/.config/skills-mapper/profiles/go-review.toml
+```
+
+Map it into the run's folder, point the sub-agent at that folder, and unmap it
+when the run is done:
+
+```
+$ sm map --profile go-review ~/runs/review-42
+map: +2 -0
+$ ls ~/runs/review-42
+go-test  lint
+$ sm status | tail -1
+mapped target: ~/runs/review-42 (2 entries; undo with: sm unmap ~/runs/review-42)
+$ sm unmap ~/runs/review-42
+~/runs/review-42: unlinked go-test
+~/runs/review-42: unlinked lint
+unmap: -2
+```
+
+For a one-off run you can skip the profile and name the skills directly:
+`sm map ~/runs/review-43 go-test lint`.
+
+### Set up skills for a container
+
+A container can't follow symlinks into your home directory, so give it real
+copies. `--agent-home` places each agent's skills folder under a new root
+instead of `$HOME`:
+
+```
+$ sm sync --agent-home ~/containers/worker --copy
+sync: claude-code +3 ~0 -0   copilot +3 ~0 -0
+$ ls ~/containers/worker/.claude/skills
+commit-msg  go-test  lint
+```
+
+Mount `~/containers/worker` as the container's home. Run the same command again
+after you change the store to refresh the copies. To remove them, run
+`sm clean --agent-home ~/containers/worker`.
+
+### Stop using an agent
+
+Delete the agent's line from `~/.config/skills-mapper/agents.toml`. `sm` then
+reports its old folder as orphaned, and `clean --orphans` removes only the
+links `sm` made there:
+
+```
+$ sm status | tail -1
+orphaned target: ~/.copilot/skills (3 entries)
+$ sm clean --orphans
+~/.copilot/skills: unlinked commit-msg
+~/.copilot/skills: unlinked go-test
+~/.copilot/skills: unlinked lint
+clean: ~/.copilot/skills -3
+```
 
 ## Map a subset into a folder
 
@@ -1149,8 +1261,8 @@ requires.
 | `<agent dir>/<name>/.sm-copy` | Copy-mode provenance marker. |
 | `<dir>/.sm-stage-*`, `<dir>/.sm-old-*` | Temporary staging and set-aside directories during a copy or replacement. |
 
-The `skills-mapper` data directory is created `0700`; `sm sync` and `sm clean`
-tighten an existing one you own to `0700` (earlier releases created it `0755`).
+The `skills-mapper` data directory is created `0700`; `sm sync`, `sm map`,
+`sm unmap` and `sm clean` tighten an existing one you own to `0700` (earlier releases created it `0755`).
 
 ## Development
 

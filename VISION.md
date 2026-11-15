@@ -85,7 +85,8 @@ Why this wins:
    its selective twin: given a profile (a short list of skill names) and a
    folder, it places just that subset of the store there, so a one-shot
    sub-agent run, or a deliberately narrow agent, sees only the skills it
-   needs, still as links back to the one canonical copy.
+   needs, still as links back to the one canonical copy. `sm unmap` takes that
+   subset back out when the run is done.
 
 ### `ms`, the ingest complement
 

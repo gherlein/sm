@@ -1,6 +1,11 @@
 # `sm map`: store-sourced, profile-selected skill projection — DESIGN
 
 Status: approved, pre-implementation. Date: 2026-11-13.
+
+> **Historical.** Implemented 2026-11-14. Since then `sm unmap` and a
+> `clean --orphans` sweep of deleted map folders were added (2026-11-15), which
+> supersedes the "no explicit unmap verb in v1" notes below. The current design
+> is [`docs/DESIGN.md`](../../DESIGN.md).
 Base: the store-model `sm`/`ms` on `origin/main` (`0476e1b`).
 
 ## Intent and why

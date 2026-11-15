@@ -2,7 +2,9 @@
 
 - **Status:** implemented (v1).
 - **Date:** 2026-10-20; `sm map` added 2026-11-14 (design:
-  [`superpowers/specs/2026-11-13-sm-store-select-design.md`](superpowers/specs/2026-11-13-sm-store-select-design.md)).
+  [`superpowers/specs/2026-11-13-sm-store-select-design.md`](superpowers/specs/2026-11-13-sm-store-select-design.md));
+  `sm unmap` and the `clean --orphans` sweep of deleted map folders added
+  2026-11-15.
 
 See [`../VISION.md`](../VISION.md) for the problem and solution,
 [`SKILLS-DIRECTORY-SPEC.md`](https://github.com/gherlein/skill-embedding-standard/blob/main/SKILLS-DIRECTORY-SPEC.md) for the
@@ -24,8 +26,9 @@ writing its embedded `SKILL.md`, or `ms`); `sm`'s only job is **store → agents
 `sm sync` fans the **whole** store into every configured agent. `sm map` is the
 selective counterpart: it projects a **named subset** of the store into **one
 folder the caller names** (a one-shot sub-agent's working directory, or a real
-agent directory), so a run sees only the skills it needs. Both read the same
-store and share the same placement, state and reconcile machinery.
+agent directory), so a run sees only the skills it needs; `sm unmap` removes
+it again. All three read the same store and share the same placement, state
+and reconcile machinery.
 
 `ms` is the companion binary for the opposite direction: a one-off ingest of the
 skills an agent already has into the store (see [`ms`](#ms--ingest-into-the-store)).
