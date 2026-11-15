@@ -49,6 +49,9 @@ brews:
       owner: gherlein
       name: homebrew-tap
       token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
+    # The tap keeps formulae in Formula/, which Homebrew prefers over the root;
+    # without this, GoReleaser writes a root copy that a stale Formula/ copy hides.
+    directory: Formula
     homepage: https://github.com/gherlein/sm
     description: Map one store of AI agent skills into every coding agent's skills folder
     license: ""
