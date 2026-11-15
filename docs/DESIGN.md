@@ -5,7 +5,7 @@
   [`superpowers/specs/2026-11-13-sm-store-select-design.md`](superpowers/specs/2026-11-13-sm-store-select-design.md)).
 
 See [`../VISION.md`](../VISION.md) for the problem and solution,
-[`SKILLS-DIRECTORY-SPEC.md`](https://github.com/gherlein/embedded-skills-standard/blob/main/SKILLS-DIRECTORY-SPEC.md) for the
+[`SKILLS-DIRECTORY-SPEC.md`](https://github.com/gherlein/skill-embedding-standard/blob/main/SKILLS-DIRECTORY-SPEC.md) for the
 agent-neutral store this design consumes, and [`../README.md`](../README.md)
 for the user-facing reference (the flags and the user-visible messages quoted
 here are listed there, in the command reference and Troubleshooting sections).
@@ -980,7 +980,7 @@ Removed packages: `config` (`skills.toml`), `cache` (clone/pull), `resolve`
   agent directories.
 - **Copy-mode polish** — a refresh could skip re-copying a copy already
   equivalent to the store, by the
-  [skill-directory equivalence](https://github.com/gherlein/embedded-skills-standard/blob/main/SKILLS-DIRECTORY-SPEC.md#55-skill-directory-equivalence)
+  [skill-directory equivalence](https://github.com/gherlein/skill-embedding-standard/blob/main/SKILLS-DIRECTORY-SPEC.md#55-skill-directory-equivalence)
   the directory specification defines (the same test the `install-skill` spec
   uses for its no-op rule).
 - **Watch / auto-sync** — re-sync when the store changes.

@@ -1,6 +1,6 @@
 // Package carried implements the install-skill and print-skill subcommands of
 // the Skill Self-Installation Specification, part of the Embedded Skills
-// Standard (github.com/gherlein/embedded-skills-standard). A tool carries one
+// Standard (github.com/gherlein/skill-embedding-standard). A tool carries one
 // skill embedded in its binary; this package prints that skill to stdout and
 // installs it into the canonical store, crash-safely and without needing the
 // tool's normal configuration, network, or target resolution.
